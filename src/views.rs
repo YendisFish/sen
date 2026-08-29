@@ -1,10 +1,17 @@
 use std::sync::{Arc, Mutex, mpsc::Sender};
 use taffy::{AlignSelf, FlexDirection, NodeId, Style, TaffyTree};
-use verdant::{types::Color, vec::Vec2, window::WindowDraw};
+use verdant::{text::Font, types::Color, vec::Vec2, window::WindowDraw};
 
-use crate::{layout, styling::{DisplayType, SenStyle}, ui::SenWindow};
+use crate::{layout, styling::{DisplayType, Margin, Padding, SenStyle}, ui::SenWindow};
 
 pub type View = Arc<dyn Component>;
+
+pub struct RenderCtx {
+    pub text: String,
+    pub text_size: f32,
+    pub font: Font,
+    pub default_color: Color,
+}
 
 #[derive(Clone, Copy)]
 pub(crate) struct SenId {
@@ -18,6 +25,8 @@ pub trait Stylable {
     fn color(self, color: Color) -> Self;
     fn display(self, tp: DisplayType) -> Self;
     fn align_self(self, slf: AlignSelf) -> Self;
+    fn padding(self, pad: Padding) -> Self;
+    fn margin(self, mar: Margin) -> Self;
 }
 
 pub(crate) trait Id {
@@ -57,6 +66,9 @@ pub trait Component: Id + Events {
     fn render(&self, window: &mut WindowDraw, tree: &mut TaffyTree, offset: Vec2, chan: Arc<Sender<View>>);
 
     fn get_style(&self) -> SenStyle;
+    fn get_ctx(&self) -> Option<RenderCtx> {
+        None
+    }
 }
 
 impl Component for () {

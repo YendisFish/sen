@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, RwLock, mpsc::Sender};
 use taffy::{AlignSelf, Size, TaffyTree, style_helpers::length};
 use verdant::{shapes::{Drawable, Rect, Style}, types::Color, vec::Vec2, window::WindowDraw};
 
-use crate::{styling::{DisplayType, SenStyle}, ui::SenWindow, views::{Component, Events, Id, SenId, Stylable, View}};
+use crate::{styling::{DisplayType, Margin, Padding, SenStyle}, ui::SenWindow, views::{Component, Events, Id, SenId, Stylable, View}};
 
 fn default_style() -> SenStyle {
     let mut r = SenStyle {
@@ -85,7 +85,7 @@ impl Component for Div {
                 Some(s) => s.fill_color,
                 None => Color::BLACK,
             })
-            .size(layout.content_box_width(), layout.content_box_height())
+            .size(layout.size.width, layout.size.height)
             .draw(window);
 
         offset.x = x;
@@ -157,6 +157,120 @@ impl Stylable for Div {
                 s.taffy.align_self = Some(slf);
             },
             None => {},
+        }
+
+        self
+    }
+
+    fn padding(self, pad: Padding) -> Self {
+        match self.style.lock() {
+            Ok(mut style) => {
+                match pad {
+                    Padding::All { t, r, b, l } => {
+                        style.taffy.padding = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Padding::Top { t } => {
+                        style.taffy.padding.top = length(t);
+                    },
+                    Padding::Bottom { b } => {
+                        style.taffy.padding.bottom = length(b);
+                    },
+                    Padding::Left { l } => {
+                        style.taffy.padding.left = length(l);
+                    },
+                    Padding::Right { r } => {
+                        style.taffy.padding.right = length(r);
+                    }
+                }
+            }
+            Err(e) => {
+                let mut style = e.into_inner();
+
+                match pad {
+                    Padding::All { t, r, b, l } => {
+                        style.taffy.padding = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Padding::Top { t } => {
+                        style.taffy.padding.top = length(t);
+                    },
+                    Padding::Bottom { b } => {
+                        style.taffy.padding.bottom = length(b);
+                    },
+                    Padding::Left { l } => {
+                        style.taffy.padding.left = length(l);
+                    },
+                    Padding::Right { r } => {
+                        style.taffy.padding.right = length(r);
+                    }
+                }
+            }
+        }
+
+        self
+    }
+
+    fn margin(self, mar: Margin) -> Self {
+        match self.style.lock() {
+            Ok(mut style) => {
+                match mar {
+                    Margin::All { t, r, b, l } => {
+                        style.taffy.margin = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Margin::Top { t } => {
+                        style.taffy.margin.top = length(t);
+                    },
+                    Margin::Bottom { b } => {
+                        style.taffy.margin.bottom = length(b);
+                    },
+                    Margin::Left { l } => {
+                        style.taffy.margin.left = length(l);
+                    },
+                    Margin::Right { r } => {
+                        style.taffy.margin.right = length(r);
+                    }
+                }
+            }
+            Err(e) => {
+                let mut style = e.into_inner();
+
+                match mar {
+                    Margin::All { t, r, b, l } => {
+                        style.taffy.margin = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Margin::Top { t } => {
+                        style.taffy.margin.top = length(t);
+                    },
+                    Margin::Bottom { b } => {
+                        style.taffy.margin.bottom = length(b);
+                    },
+                    Margin::Left { l } => {
+                        style.taffy.margin.left = length(l);
+                    },
+                    Margin::Right { r } => {
+                        style.taffy.margin.right = length(r);
+                    }
+                }
+            }
         }
 
         self

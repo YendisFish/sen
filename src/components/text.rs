@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex, OnceLock, mpsc::Sender};
 
 use taffy::{AlignSelf, Size, TaffyTree, style_helpers::length};
-use verdant::{render_surface::RenderSurface, text::{Font, RichText, Span, TextStyle}, types::{ByteSource, Color}, vec::Vec2, window::WindowDraw};
+use verdant::{render_surface::RenderSurface, text::{Font, RichText, Span, TextStyle}, transform::Transform2d, types::{ByteSource, Color}, vec::Vec2, window::WindowDraw};
 
-use crate::{styling::{DisplayType, SenStyle}, views::{Component, Events, Id, SenId, Stylable, View}};
+use crate::{styling::{DisplayType, Margin, Padding, SenStyle}, views::{Component, Events, Id, RenderCtx, SenId, Stylable, View}};
 
 pub struct Text {
     id: Mutex<Option<SenId>>,
@@ -73,20 +73,12 @@ impl Component for Arc<Text> {
     }
 
     fn get_style(&self) -> SenStyle {
-        match self.is_sized.get() {
-            Some(s) => {
-                let mut t = taffy::Style::DEFAULT;
-                t.size = Size {
-                    width: length(s.x),
-                    height: length(s.y),
-                };
-
-                SenStyle {
-                    taffy: t,
-                    ..Default::default()
-                }
-            },
-            None => Default::default()
+        match self.style.lock() {
+            Ok(val) => val.clone(),
+            Err(e) => {
+                let val = e.into_inner();
+                val.clone()
+            }
         }
     }
 
@@ -118,17 +110,26 @@ impl Component for Arc<Text> {
             ..Default::default()
         });
 
-        match self.is_sized.get() {
-            Some(_) => {},
-            None => {
-                let (w, h) = window.rich_text_size(&[span.clone()]).into();
-                _ = self.is_sized.set(Vec2::new(w, *size * 1.3));
-
-                _ = chan.send(self.clone().as_view());
-            },
-        };
+        let Some(mut style) = self.style.lock().ok() else { return; };
+        style.offset = Some(offset);
 
         window.rich_text(x, y, &[span]);
+    }
+
+    fn get_ctx(&self) -> Option<RenderCtx> {
+        let color = match self.style.lock() {
+            Ok(val) => match val.verdant {
+                Some(v) => v.fill_color,
+                None => Color::BLACK,
+            }
+            Err(e) => match e.into_inner().verdant {
+                Some(v) => v.fill_color,
+                None => Color::BLACK,
+            }
+        };
+
+        let Some(size) = self.size.lock().ok() else { return None; };
+        Some(RenderCtx { text: self.text.clone(), text_size: *size, font: self.font.clone(), default_color: color })
     }
 }
 
@@ -167,6 +168,120 @@ impl Stylable for Arc<Text> {
                 s.taffy.align_self = Some(slf);
             },
             None => {},
+        }
+
+        self
+    }
+
+    fn padding(self, pad: Padding) -> Self {
+        match self.style.lock() {
+            Ok(mut style) => {
+                match pad {
+                    Padding::All { t, r, b, l } => {
+                        style.taffy.padding = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Padding::Top { t } => {
+                        style.taffy.padding.top = length(t);
+                    },
+                    Padding::Bottom { b } => {
+                        style.taffy.padding.bottom = length(b);
+                    },
+                    Padding::Left { l } => {
+                        style.taffy.padding.left = length(l);
+                    },
+                    Padding::Right { r } => {
+                        style.taffy.padding.right = length(r);
+                    }
+                }
+            }
+            Err(e) => {
+                let mut style = e.into_inner();
+
+                match pad {
+                    Padding::All { t, r, b, l } => {
+                        style.taffy.padding = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Padding::Top { t } => {
+                        style.taffy.padding.top = length(t);
+                    },
+                    Padding::Bottom { b } => {
+                        style.taffy.padding.bottom = length(b);
+                    },
+                    Padding::Left { l } => {
+                        style.taffy.padding.left = length(l);
+                    },
+                    Padding::Right { r } => {
+                        style.taffy.padding.right = length(r);
+                    }
+                }
+            }
+        }
+
+        self
+    }
+
+    fn margin(self, mar: Margin) -> Self {
+        match self.style.lock() {
+            Ok(mut style) => {
+                match mar {
+                    Margin::All { t, r, b, l } => {
+                        style.taffy.margin = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Margin::Top { t } => {
+                        style.taffy.margin.top = length(t);
+                    },
+                    Margin::Bottom { b } => {
+                        style.taffy.margin.bottom = length(b);
+                    },
+                    Margin::Left { l } => {
+                        style.taffy.margin.left = length(l);
+                    },
+                    Margin::Right { r } => {
+                        style.taffy.margin.right = length(r);
+                    }
+                }
+            }
+            Err(e) => {
+                let mut style = e.into_inner();
+
+                match mar {
+                    Margin::All { t, r, b, l } => {
+                        style.taffy.margin = taffy::Rect {
+                            left: length(l),
+                            right: length(r),
+                            top: length(t),
+                            bottom: length(b)
+                        };
+                    },
+                    Margin::Top { t } => {
+                        style.taffy.margin.top = length(t);
+                    },
+                    Margin::Bottom { b } => {
+                        style.taffy.margin.bottom = length(b);
+                    },
+                    Margin::Left { l } => {
+                        style.taffy.margin.left = length(l);
+                    },
+                    Margin::Right { r } => {
+                        style.taffy.margin.right = length(r);
+                    }
+                }
+            }
         }
 
         self

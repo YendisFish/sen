@@ -1,6 +1,6 @@
 use std::{any::Any, collections::{BinaryHeap, HashMap}, process::exit, sync::{Arc, mpsc::{Receiver, Sender, channel}}, time::{self, Duration, Instant}};
 
-use taffy::{Size, TaffyTree, style_helpers::length};
+use taffy::{NodeId, Size, TaffyTree, style_helpers::length};
 use verdant::{prelude::*, window::Window};
 
 use crate::{components::{div::Div, many::Many}, layout::Layout, ui::UiError::CastError, views::{Component, Stylable, View}};
@@ -17,10 +17,11 @@ pub struct SenWindow {
     layout: Layout,
     pub force_thread_timeout: Option<Duration>,
     pub(crate) ctx: WindowCtx,
+    pub window_size: Vec2,
 }
 
 impl SenWindow {
-    pub fn new(window: WindowId) -> Self {
+    pub fn new(window: WindowId, size: Vec2) -> Self {
         let chan: (Sender<View>, Receiver<View>) = channel();
         Self {
             window: window,
@@ -29,19 +30,12 @@ impl SenWindow {
             layout: Layout::new(Vec2::new(1920., 1080.)),
             force_thread_timeout: None,
             ctx: Default::default(),
+            window_size: size,
         }
     }
 
     pub fn start(&mut self, renderer: &mut Renderer, view: &mut View) {
-        let app = Div::new(Many::new(vec![view.clone()])).size(Vec2 { x: 1920., y: 1080. }).as_view();
-        self.layout.build_from(&app, None);
-
-        _ = self.layout.taffy.compute_layout(app.get_id().unwrap().taffy, Size {
-            height: length(1920.),
-            width: length(1080.),
-        });
-
-        let Some(root_id) = app.get_id() else { return; };
+        let app = Div::new(Many::new(vec![view.clone()])).size(self.window_size).as_view();
 
         let mut first = false;
         while renderer.is_running() {
@@ -62,10 +56,6 @@ impl SenWindow {
                                 break;
                             }
                         }
-                        // match vec.iter().max_by_key(|t| t.1) {
-                        //     Some(l) => l.0.click(),
-                        //     None => break,
-                        // };
                     },
                     WindowEvent::PointerButton { pressed: false, button, position, .. } => {
                         if self.ctx.dragging {
@@ -120,13 +110,12 @@ impl SenWindow {
 
                         _ = self.layout.taffy.set_style(id.taffy, v.get_style().taffy);
                         let Some(layout) = self.layout.taffy.layout(id.taffy).ok() else { continue; };
-                        let w = layout.content_box_width();
-                        let h = layout.content_box_height();
 
                         match v.get_inner() {
                             Some(chil) => {
                                 for c in chil.as_ref() {
                                     self.layout.build_from(
+                                        &mut win,
                                         c,
                                         Some(id.taffy));
                                 }
@@ -135,6 +124,8 @@ impl SenWindow {
                         }
 
                         _ = self.layout.taffy.mark_dirty(id.taffy);
+
+                        let Some(root_id) = app.get_id() else { continue; };
                         _ = self.layout.taffy.compute_layout(root_id.taffy, Size {
                             height: length(win.get_height()),
                             width: length(win.get_width()),
@@ -145,6 +136,13 @@ impl SenWindow {
                 }
 
                 if !first {
+                    self.layout.build_from(&mut win, &app, None);
+
+                    _ = self.layout.taffy.compute_layout(app.get_id().unwrap().taffy, Size {
+                        height: length(1920.),
+                        width: length(1080.),
+                    });
+
                     app.render(&mut win, &mut self.layout.taffy, Vec2::new(0., 0.), self.sender.clone());
                     first = true;
                 }
@@ -176,8 +174,8 @@ fn find_views_at(
     let x = offset.x + layout.location.x;
     let y = offset.y + layout.location.y;
 
-    let in_x = position.x >= x && position.x <= x + layout.content_box_width();
-    let in_y = position.y >= y && position.y <= y + layout.content_box_height();
+    let in_x = position.x >= x && position.x <= x + layout.size.width;
+    let in_y = position.y >= y && position.y <= y + layout.size.height;
     if !(in_x && in_y) {
         return;
     }

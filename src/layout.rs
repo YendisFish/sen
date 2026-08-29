@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use taffy::prelude::*;
-use verdant::vec::Vec2;
+use verdant::{render_surface::RenderSurface, text::{Span, TextStyle}, types::Color, vec::Vec2, window::WindowDraw};
 
 use crate::views::{Component, SenId, View};
 
@@ -20,11 +20,26 @@ impl Layout {
         }
     }
 
-    pub fn build_from(&mut self, c: &View, mut node: Option<NodeId>) {
+    pub fn build_from(&mut self, win: &mut WindowDraw, c: &View, mut node: Option<NodeId>) {
         let taffy = &mut self.taffy;
 
         let style = c.get_style();
-        let taffy_style = style.taffy;
+        let mut taffy_style = style.taffy;
+
+        if let Some(ctx) = c.get_ctx() {
+            let span = Span::new(ctx.text, ctx.font, TextStyle {
+                size: ctx.text_size,
+                color: ctx.default_color,
+                ..Default::default()
+            });
+
+            let (w, _) = win.rich_text_size(&[span.clone()]).into();
+
+            taffy_style.size = Size {
+                width: length(w),
+                height: length(ctx.text_size * 1.3),
+            };
+        }
 
         let new_node = match taffy.new_leaf(taffy_style) {
             Ok(n) => n,
@@ -46,7 +61,7 @@ impl Layout {
 
         let Some(comp_tree) = c.get_inner() else { return; };
         for com in comp_tree.as_ref() {
-            self.build_from(com, node);
+            self.build_from(win, com, node);
         }
     }
 }

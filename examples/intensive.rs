@@ -6,7 +6,7 @@ use verdant::{vec, window};
 fn main() -> Result<(), Error> {
     let mut renderer = Renderer::new().unwrap();
     let window = renderer.create_window("Counter", 1920, 1080);
-    let mut swin = SenWindow::new(window);
+    let mut swin = SenWindow::new(window, Vec2::new(1920., 1080.));
     swin.force_thread_timeout = Some(Duration::from_secs(1) / 60);
 
     swin.start(&mut renderer, &mut App().as_view());
