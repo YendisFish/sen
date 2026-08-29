@@ -30,6 +30,34 @@ pub enum Margin {
     Right { r: f32 },
 }
 
+impl Padding {
+    pub fn uniform(size: f32) -> Self {
+        Padding::All { t: size, r: size, b: size, l: size }
+    }
+
+    pub fn left_right(l: f32, r: f32) -> Self {
+        Padding::All { t: 0., r: r, b: 0., l: l }
+    }
+
+    pub fn all(t: f32, r: f32, b: f32, l: f32) -> Self {
+        Padding::All { t, r, b, l }
+    }
+}
+
+impl Margin {
+    pub fn uniform(size: f32) -> Self {
+        Margin::All { t: size, r: size, b: size, l: size }
+    }
+
+    pub fn left_right(l: f32, r: f32) -> Self {
+        Margin::All { t: 0., r: r, b: 0., l: l }
+    }
+
+    pub fn all(t: f32, r: f32, b: f32, l: f32) -> Self {
+        Margin::All { t, r, b, l }
+    }
+}
+
 impl Default for SenStyle {
     fn default() -> Self {
         let mut t: Style<String> = Style::DEFAULT;

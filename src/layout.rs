@@ -34,11 +34,12 @@ impl Layout {
             });
 
             let (w, _) = win.rich_text_size(&[span.clone()]).into();
-
             taffy_style.size = Size {
                 width: length(w),
                 height: length(ctx.text_size * 1.3),
             };
+
+            taffy_style.box_sizing = taffy::style::BoxSizing::ContentBox;
         }
 
         let new_node = match taffy.new_leaf(taffy_style) {

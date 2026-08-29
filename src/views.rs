@@ -27,6 +27,8 @@ pub trait Stylable {
     fn align_self(self, slf: AlignSelf) -> Self;
     fn padding(self, pad: Padding) -> Self;
     fn margin(self, mar: Margin) -> Self;
+    fn outline(self, color: Color, size: f32) -> Self;
+    fn rounding(self, rounding: f32) -> Self;
 }
 
 pub(crate) trait Id {

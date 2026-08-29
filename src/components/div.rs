@@ -77,15 +77,18 @@ impl Component for Div {
         };
 
         let Some(mut style) = self.style.lock().ok() else { return; };
+        let verdant = match style.verdant {
+            Some(v) => v,
+            None => default_style().verdant.unwrap(),
+        };
 
         let x = offset.x + layout.location.x;
         let y = offset.y + layout.location.y;
         Rect::at(x, y)
-            .fill(match style.verdant {
-                Some(s) => s.fill_color,
-                None => Color::BLACK,
-            })
+            .fill(verdant.fill_color)
             .size(layout.size.width, layout.size.height)
+            .corner_radius(verdant.corner_radius)
+            .outline(verdant.outline_color, verdant.outline_width)
             .draw(window);
 
         offset.x = x;
@@ -163,8 +166,8 @@ impl Stylable for Div {
     }
 
     fn padding(self, pad: Padding) -> Self {
-        match self.style.lock() {
-            Ok(mut style) => {
+        match self.style.lock().ok() {
+            Some(mut style) => {
                 match pad {
                     Padding::All { t, r, b, l } => {
                         style.taffy.padding = taffy::Rect {
@@ -188,40 +191,15 @@ impl Stylable for Div {
                     }
                 }
             }
-            Err(e) => {
-                let mut style = e.into_inner();
-
-                match pad {
-                    Padding::All { t, r, b, l } => {
-                        style.taffy.padding = taffy::Rect {
-                            left: length(l),
-                            right: length(r),
-                            top: length(t),
-                            bottom: length(b)
-                        };
-                    },
-                    Padding::Top { t } => {
-                        style.taffy.padding.top = length(t);
-                    },
-                    Padding::Bottom { b } => {
-                        style.taffy.padding.bottom = length(b);
-                    },
-                    Padding::Left { l } => {
-                        style.taffy.padding.left = length(l);
-                    },
-                    Padding::Right { r } => {
-                        style.taffy.padding.right = length(r);
-                    }
-                }
-            }
+            None => {}
         }
 
         self
     }
 
     fn margin(self, mar: Margin) -> Self {
-        match self.style.lock() {
-            Ok(mut style) => {
+        match self.style.lock().ok() {
+            Some(mut style) => {
                 match mar {
                     Margin::All { t, r, b, l } => {
                         style.taffy.margin = taffy::Rect {
@@ -245,32 +223,40 @@ impl Stylable for Div {
                     }
                 }
             }
-            Err(e) => {
-                let mut style = e.into_inner();
+            None => {}
+        }
 
-                match mar {
-                    Margin::All { t, r, b, l } => {
-                        style.taffy.margin = taffy::Rect {
-                            left: length(l),
-                            right: length(r),
-                            top: length(t),
-                            bottom: length(b)
-                        };
+        self
+    }
+
+    fn outline(self, color: Color, size: f32) -> Self {
+        match self.style.lock().ok() {
+            Some(mut style) => {
+                match &mut style.verdant {
+                    Some(v) => {
+                        v.outline_color = color;
+                        v.outline_width = size;
                     },
-                    Margin::Top { t } => {
-                        style.taffy.margin.top = length(t);
-                    },
-                    Margin::Bottom { b } => {
-                        style.taffy.margin.bottom = length(b);
-                    },
-                    Margin::Left { l } => {
-                        style.taffy.margin.left = length(l);
-                    },
-                    Margin::Right { r } => {
-                        style.taffy.margin.right = length(r);
-                    }
+                    None => {},
                 }
-            }
+            },
+            None => {},
+        }
+
+        self
+    }
+
+    fn rounding(self, rounding: f32) -> Self {
+        match self.style.lock().ok() {
+            Some(mut style) => {
+                match &mut style.verdant {
+                    Some(v) => {
+                        v.corner_radius = rounding;
+                    },
+                    None => {},
+                }
+            },
+            None => {},
         }
 
         self
