@@ -95,3 +95,12 @@ impl Component for Many {
         }
     }
 }
+
+#[macro_export]
+macro_rules! many {
+    ( $($x:expr),* $(,)? ) => {
+        Many::new(vec![
+            $( $x.as_view(), )*
+        ])
+    };
+}

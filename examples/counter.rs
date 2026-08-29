@@ -18,20 +18,20 @@ fn main() -> Result<(), Error> {
 fn App() -> impl Component {
     let font = Font::load("/System/Library/Fonts/SFNS.ttf").unwrap();
     let s = State::new(0);
-    Div::new(Many::new(vec![
+    Div::new(many![
         s.with(move |val| {
             sen::components::text::Text::new(val.to_string(), font.clone())
                 .text_size(25.)
                 .padding(Padding::Top { t: 20. })
                 .as_view()
-        }).as_view(),
+        }),
         Div::new(
             Button("Click Me!", enclose!([s] move || {
                 let val = *s.get();
                 _ = s.set(val + 1);
             }))
-        ).margin(Margin::Top { t: 10. }).color(Color::TRANSPARENT).as_view(),
-    ]).display(DisplayType::Flex(FlexDirection::Column))).color(Color::WHITE).size(Vec2::new(1920., 1080.))
+        ).margin(Margin::Top { t: 10. }).color(Color::TRANSPARENT),
+    ].display(DisplayType::Flex(FlexDirection::Column))).color(Color::WHITE).size(Vec2::new(1920., 1080.))
 }
 
 #[allow(non_snake_case)]
@@ -42,12 +42,11 @@ fn Button(text: impl Into<String>, fun: impl Fn() + 'static) -> Arc<State<(Strin
     let f = Arc::new(fun);
     state.with(move |val| {
         let fclone = f.clone();
-        Div::new(Many::new(vec![
+        Div::new(many![
             sen::components::text::Text::new(val.0.clone(), font.clone())
                 .text_size(25.)
                 .padding(Padding::uniform(10.))
-                .as_view()
-        ]))
+        ])
         .on_click(move || fclone.as_ref()())
         .color(Color::AQUAMARINE)
         .align_self(AlignSelf::FLEX_START)
