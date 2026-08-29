@@ -1,7 +1,7 @@
 use std::{any::Any, collections::{BinaryHeap, HashMap}, process::exit, sync::{Arc, mpsc::{Receiver, Sender, channel}}, time::{self, Duration, Instant}};
 
 use taffy::{NodeId, Size, TaffyTree, style_helpers::length};
-use verdant::{prelude::*, window::Window};
+use verdant::{event::winit::PhysicalKey::{self, Code}, prelude::*, window::Window};
 
 use crate::{components::{div::Div, many::Many}, layout::Layout, ui::UiError::CastError, views::{Component, Stylable, View}};
 
@@ -50,9 +50,14 @@ impl SenWindow {
                         let mut vec: Vec<(View, usize)> = Vec::new();
                         find_views_at(position, &app, Vec2::new(0., 0.), &mut self.layout.taffy, &mut vec, 0);
 
+                        let mut focus = false;
                         vec.sort_unstable_by_key(|&(_, depth)| std::cmp::Reverse(depth));
                         for (vw, _) in vec.iter() {
-                            if vw.click() {
+                            if vw.click(&mut focus) {
+                                if focus {
+                                    self.ctx.focused = Some(vw.clone())
+                                }
+
                                 break;
                             }
                         }
@@ -60,8 +65,6 @@ impl SenWindow {
                     WindowEvent::PointerButton { pressed: false, button, position, .. } => {
                         if self.ctx.dragging {
                             // trigger drag_drop
-
-                            // dragged component could possibly be no longer on the view tree?
                         }
 
                         //mouse up
@@ -97,6 +100,9 @@ impl SenWindow {
                         } else {
                             // trigger mouse_over
                         }
+                    },
+                    WindowEvent::KeyboardInput { device_id, pressed: true, is_repeat, physical_key, logical_key } => {
+                        // only trigger events for self.ctx.focused, otherwise only watch for special keybinds
                     },
                     _ => {},
                 }
@@ -194,6 +200,7 @@ pub(crate) struct WindowCtx {
     pub(crate) mouse_left_down: bool,
     pub(crate) dragging: bool,
     pub(crate) in_cursor: Option<View>,
+    pub(crate) focused: Option<View>,
 }
 
 impl Default for WindowCtx {
@@ -202,6 +209,7 @@ impl Default for WindowCtx {
             mouse_left_down: false,
             dragging: false,
             in_cursor: None,
+            focused: None,
         }
     }
 }

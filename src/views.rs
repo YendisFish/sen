@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex, mpsc::Sender};
 use taffy::{AlignSelf, FlexDirection, NodeId, Style, TaffyTree};
-use verdant::{text::Font, types::Color, vec::Vec2, window::WindowDraw};
+use verdant::{event::Key, text::Font, types::Color, vec::Vec2, window::WindowDraw};
 
 use crate::{layout, styling::{DisplayType, Margin, Padding, SenStyle}, ui::SenWindow};
 
@@ -52,13 +52,15 @@ impl Id for () {
 }
 
 pub(crate) trait Events {
-    fn click(&self) -> bool;
+    fn click(&self, request_focus: &mut bool) -> bool;
     fn drag_over(&self, view: Option<View>);
+    fn key_down(&self, key: Key);
 }
 
 impl Events for () {
-    fn click(&self) -> bool { false }
+    fn click(&self, set_focus: &mut bool) -> bool { false }
     fn drag_over(&self, view: Option<View>) {}
+    fn key_down(&self, key: Key) { }
 }
 
 // this comment makes things more readable :)

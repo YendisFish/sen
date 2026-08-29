@@ -264,7 +264,7 @@ impl Stylable for Div {
 }
 
 impl Events for Div {
-    fn click(&self) -> bool {
+    fn click(&self, set_focus: &mut bool) -> bool {
         let Some(c) = &self.on_click else { return false; };
         c();
 
@@ -272,4 +272,8 @@ impl Events for Div {
     }
 
     fn drag_over(&self, view: Option<View>) {}
+
+    fn key_down(&self, key: verdant::prelude::Key) {
+
+    }
 }

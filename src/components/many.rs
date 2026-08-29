@@ -72,8 +72,10 @@ impl Id for Many {
 }
 
 impl Events for Many {
-    fn click(&self) -> bool { false }
+    fn click(&self, set_focus: &mut bool) -> bool { false }
     fn drag_over(&self, view: Option<View>) {}
+
+    fn key_down(&self, key: verdant::prelude::Key) {}
 }
 
 impl Component for Many {

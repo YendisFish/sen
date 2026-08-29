@@ -40,8 +40,10 @@ impl Text {
 }
 
 impl Events for Arc<Text> {
-    fn click(&self) -> bool { false }
+    fn click(&self, set_focus: &mut bool) -> bool { false }
     fn drag_over(&self, view: Option<View>) {}
+
+    fn key_down(&self, key: verdant::prelude::Key) {}
 }
 
 impl Id for Arc<Text> {

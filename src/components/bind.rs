@@ -142,10 +142,14 @@ impl<T: 'static> Component for Arc<State<T>> {
 }
 
 impl<T: 'static> Events for Arc<State<T>> {
-    fn click(&self) -> bool { false }
+    fn click(&self, set_focused: &mut bool) -> bool { false }
     fn drag_over(&self, view: Option<View>) {
         let Some(c) = self.on_drag_over.get() else { return; };
         let Some(vw) = view else { return; };
         c(vw);
+    }
+
+    fn key_down(&self, key: verdant::prelude::Key) {
+
     }
 }
