@@ -1,8 +1,15 @@
-use std::{hash::Hash, io::Error, sync::Arc, time::Duration};
+# Sen
+Sen is a unique UI framework, built with the 
+[Verdant rendering library](https://github.com/grimtin10/verdant), which
+focuses on being declarative with good defaults.
 
-use sen::{components::{bind::State, div::Div, many::Many}, layout::Layout, styling::DisplayType, ui::SenWindow, views::{Component, Stylable, View}, *};
-use verdant::{vec, window};
+**Sen is not yet at a usable version**
 
+# Usage
+Feel free to go to the ``examples/`` directory to see all the examples I've
+put together, however here is a basic counter program.
+
+```rs
 fn main() -> Result<(), Error> {
     let mut renderer = Renderer::new().unwrap();
     let window = renderer.create_window("Counter", 1920, 1080);
@@ -42,3 +49,13 @@ fn Button(text: impl Into<String>, fun: impl Fn() + 'static) -> Arc<State<(Strin
         ])).on_click(move || fclone.as_ref()()).color(Color::AQUAMARINE).align_self(AlignSelf::FLEX_START).as_view()
     })
 }
+```
+
+# Upcoming
+There's much to do, however, here are some big things I would like to
+get done with this library.
+
+- [ ] Remove hardcoded sizing from the window
+- [ ] Replace window type with ``impl RenderSurface``
+- [ ] Expand styling to cover all of taffy's abilities
+- [ ] Add more stateful builtin components
