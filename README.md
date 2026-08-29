@@ -61,3 +61,4 @@ get done with this library.
 - [ ] Replace window type with ``impl RenderSurface``
 - [ ] Expand styling to cover all of taffy's abilities
 - [ ] Add more stateful builtin components
+- [ ] Fix styling so that taffy doesn't use so much memory
