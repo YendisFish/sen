@@ -14,7 +14,7 @@ pub struct RenderCtx {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct SenId {
+pub struct SenId {
     pub sen: usize,
     pub taffy: NodeId,
 }
@@ -31,7 +31,7 @@ pub trait Stylable {
     fn rounding(self, rounding: f32) -> Self;
 }
 
-pub(crate) trait Id {
+pub trait Id {
     fn set_id(&self, id: SenId);
     fn get_id(&self) -> Option<SenId>;
 }
@@ -51,7 +51,7 @@ impl Id for () {
     fn get_id(&self) -> Option<SenId> { None }
 }
 
-pub(crate) trait Events {
+pub trait Events {
     fn click(&self, request_focus: &mut bool) -> bool;
     fn drag_over(&self, view: Option<View>);
     fn key_down(&self, key: Key);
