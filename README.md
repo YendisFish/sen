@@ -3,6 +3,8 @@ Sen is a unique UI framework, built with the
 [Verdant rendering library](https://github.com/grimtin10/verdant), which
 focuses on being declarative with good defaults.
 
+![Sen demo](assets/sen.gif)
+
 **Sen is not yet at a usable version**
 
 # Usage
