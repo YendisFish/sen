@@ -71,7 +71,7 @@ fn Button(text: impl Into<String>, fun: impl Fn() + 'static) -> Arc<State<(Strin
 There's much to do, however, here are some big things I would like to
 get done with this library.
 
-- [ ] Remove hardcoded sizing from the window
+- [x] Remove hardcoded sizing from the window
 - [ ] Replace window type with ``impl RenderSurface``
 - [ ] Expand styling to cover all of taffy's abilities
 - [ ] Add more stateful builtin components
