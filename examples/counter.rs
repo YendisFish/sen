@@ -7,7 +7,11 @@ fn main() -> Result<(), Error> {
     let mut renderer = Renderer::new().unwrap();
     let window = renderer.create_window("Counter", 1920, 1080);
     let mut swin = SenWindow::new(window, Vec2::new(1920., 1080.));
-    swin.force_thread_timeout = Some(Duration::from_secs(1) / 60);
+
+    #[cfg(target_os =  "macos")]
+    {
+        swin.force_thread_timeout = Some(Duration::from_secs(1) / 60);
+    }
 
     swin.start(&mut renderer, &mut App().as_view());
 
@@ -30,7 +34,7 @@ fn App() -> impl Component {
                 let val = *s.get();
                 _ = s.set(val + 1);
             }))
-        ).margin(Margin::Top { t: 10. }).color(Color::TRANSPARENT),
+        ).margin(Margin::Top { t: 10. }).color(Color::RED),
     ].display(DisplayType::Flex(FlexDirection::Column))).color(Color::WHITE).size(Vec2::new(1920., 1080.))
 }
 

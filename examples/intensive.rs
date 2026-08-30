@@ -15,10 +15,7 @@ fn main() -> Result<(), Error> {
 }
 
 /*
- * Interestingly the components for Sen only use
- * 44MB until they are handed over to the WGPU
- * instance. Seems like loading 500,000 components
- * for the GPU shouldn't happen.
+ * Taffy is very bad...
  */
 
 #[allow(non_snake_case)]
