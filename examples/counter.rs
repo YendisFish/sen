@@ -34,7 +34,7 @@ fn App() -> impl Component {
                 let val = *s.get();
                 _ = s.set(val + 1);
             }))
-        ).margin(Margin::Top { t: 10. }).color(Color::RED),
+        ).margin(Margin::Top { t: 10. }).color(Color::TRANSPARENT),
     ].display(DisplayType::Flex(FlexDirection::Column))).color(Color::WHITE).size(Vec2::new(1920., 1080.))
 }
 
