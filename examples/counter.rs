@@ -1,6 +1,6 @@
 use std::{hash::Hash, io::Error, sync::Arc, time::Duration};
 
-use sen::{components::{bind::State, div::Div, many::Many}, layout::Layout, styling::{DisplayType, Margin, Padding}, ui::SenWindow, views::{Component, Stylable, View}, *};
+use sen::{components::{bind::State, div::Div, input::Input, many::Many}, layout::Layout, styling::{DisplayType, Margin, Padding}, ui::SenWindow, views::{Component, Stylable, View}, *};
 use verdant::{vec, window};
 
 fn main() -> Result<(), Error> {
@@ -21,6 +21,7 @@ fn main() -> Result<(), Error> {
 #[allow(non_snake_case)]
 fn App() -> impl Component {
     let font = Font::load("/System/Library/Fonts/SFNS.ttf").unwrap();
+    let font_clone = font.clone();
     let s = State::new(0);
     Div::new(many![
         s.with(move |val| {
@@ -35,6 +36,7 @@ fn App() -> impl Component {
                 _ = s.set(val + 1);
             }))
         ).margin(Margin::Top { t: 10. }).color(Color::TRANSPARENT),
+        Input::new(font_clone, None).size(Vec2::new(500., 50.)),
     ].display(DisplayType::Flex(FlexDirection::Column))).color(Color::WHITE).size(Vec2::new(1920., 1080.))
 }
 

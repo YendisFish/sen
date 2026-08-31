@@ -44,6 +44,20 @@ impl<T: 'static> State<T> {
         self.clone()
     }
 
+    pub fn recompute(self: &Arc<Self>) {
+        if let Some(arc) = self.closure.get() {
+            let current_value = &*self.get();
+            let new_views = arc.as_ref()(current_value);
+
+            let mut current_view = match self.current_view.write() {
+                Ok(val) => val,
+                Err(e) => e.into_inner(),
+            };
+
+            *current_view = Arc::new(vec![new_views]);
+        }
+    }
+
     pub fn get(&self) -> RwLockReadGuard<'_, T> {
         match self.item.read() {
             Ok(guard) => guard,

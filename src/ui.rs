@@ -45,6 +45,7 @@ impl SenWindow {
                 match event {
                     WindowEvent::CloseRequested => { renderer.close_window(id); },
                     WindowEvent::PointerButton { pressed: true, button, position, .. } => {
+                        self.ctx.focused = None;
                         self.ctx.mouse_left_down = true;
 
                         let mut vec: Vec<(View, usize)> = Vec::new();
@@ -103,6 +104,12 @@ impl SenWindow {
                     },
                     WindowEvent::KeyboardInput { device_id, pressed: true, is_repeat, physical_key, logical_key } => {
                         // only trigger events for self.ctx.focused, otherwise only watch for special keybinds
+                        match &self.ctx.focused {
+                            Some(comp) => {
+                                comp.key_down(logical_key);
+                            },
+                            None => {},
+                        }
                     },
                     _ => {},
                 }
