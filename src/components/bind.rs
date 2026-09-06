@@ -5,16 +5,16 @@ use verdant::{vec::Vec2, window::WindowDraw};
 
 use crate::{layout::{LAST_ID, Layout}, styling::SenStyle, ui::{SenWindow, UiError}, views::{Component, Events, Id, SenId, View}};
 
-pub struct State<T: 'static> {
+pub struct State<T: 'static + Send + Sync> {
     id: Mutex<Option<SenId>>,
     item: RwLock<T>,
-    closure: OnceLock<Box<dyn Fn(&T) -> View + 'static>>,
+    closure: OnceLock<Box<dyn Fn(&T) -> View + 'static + Send + Sync>>,
     current_view: RwLock<Arc<Vec<View>>>,
     notifier: OnceLock<Arc<Sender<View>>>,
-    on_drag_over: OnceLock<Box<dyn Fn(View)>>,
+    on_drag_over: OnceLock<Box<dyn Fn(View) + Send + Sync>>,
 }
 
-impl<T: 'static> State<T> {
+impl<T: 'static + Send + Sync> State<T> {
     pub fn new(val: T) -> Arc<Self> {
         Arc::new(Self {
             id: Mutex::new(None),
@@ -26,7 +26,7 @@ impl<T: 'static> State<T> {
         })
     }
 
-    pub fn with(self: &Arc<Self>, closure: impl Fn(&T) -> View + 'static) -> Arc<Self> {
+    pub fn with(self: &Arc<Self>, closure: impl Fn(&T) -> View + 'static + Send + Sync) -> Arc<Self> {
         _ = self.closure.set(Box::new(closure));
 
         if let Some(arc) = self.closure.get() {
@@ -94,13 +94,18 @@ impl<T: 'static> State<T> {
         }
     }
 
-    pub fn on_drag_over(self: Arc<Self>, fun: impl Fn(View) + 'static) -> Arc<Self> {
+    pub fn on_drag_over(self: Arc<Self>, fun: impl Fn(View) + 'static + Send + Sync) -> Arc<Self> {
         _ = self.on_drag_over.set(Box::new(fun));
+        self
+    }
+
+    fn bind_to(self: Arc<Self>, val: &mut Arc<State<T>>) -> Arc<Self> {
+        *val = self.clone();
         self
     }
 }
 
-impl<T: 'static> Id for Arc<State<T>> {
+impl<T: 'static + Send + Sync> Id for Arc<State<T>> {
     fn set_id(&self, id: SenId) {
         let mut id_guard = match self.id.lock() {
             Ok(guard) => guard,
@@ -117,7 +122,7 @@ impl<T: 'static> Id for Arc<State<T>> {
     }
 }
 
-impl<T: 'static> Component for Arc<State<T>> {
+impl<T: 'static + Send + Sync> Component for Arc<State<T>> {
     fn as_view(self) -> View { Arc::new(self) }
 
     fn get_inner(&self) -> Option<Arc<Vec<View>>> {
@@ -153,9 +158,10 @@ impl<T: 'static> Component for Arc<State<T>> {
     fn get_style(&self) -> SenStyle {
         Default::default()
     }
+
 }
 
-impl<T: 'static> Events for Arc<State<T>> {
+impl<T: 'static + Send + Sync> Events for Arc<State<T>> {
     fn click(&self, set_focused: &mut bool) -> bool { false }
     fn drag_over(&self, view: Option<View>) {
         let Some(c) = self.on_drag_over.get() else { return; };

@@ -39,6 +39,7 @@ impl SenWindow {
 
         let mut first = false;
         while renderer.is_running() {
+            println!("loop running");
             let elapsed = Instant::now();
 
             for (id, event) in renderer.poll() {
@@ -121,7 +122,7 @@ impl SenWindow {
                     if let Some(id) = v.get_id() {
                         _ = self.layout.taffy.set_children(id.taffy, &[]);
 
-                        _ = self.layout.taffy.set_style(id.taffy, v.get_style().taffy);
+                        _ = self.layout.taffy.set_style(id.taffy, v.get_style().taffy().clone());
                         let Some(layout) = self.layout.taffy.layout(id.taffy).ok() else { continue; };
 
                         match v.get_inner() {

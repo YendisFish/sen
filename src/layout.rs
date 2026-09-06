@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use taffy::prelude::*;
 use verdant::{render_surface::RenderSurface, text::{Span, TextStyle}, types::Color, vec::Vec2, window::WindowDraw};
 
-use crate::views::{Component, SenId, View};
+use crate::{components::text::TEXT_MULTIPLIER, views::{Component, SenId, View}};
 
 pub static LAST_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -24,19 +24,21 @@ impl Layout {
         let taffy = &mut self.taffy;
 
         let style = c.get_style();
-        let mut taffy_style = style.taffy;
+        let mut taffy_style = style.taffy().clone();
 
         if let Some(ctx) = c.get_ctx() {
-            let span = Span::new(ctx.text, ctx.font, TextStyle {
+            let span = Span::new(ctx.text.clone(), ctx.font, TextStyle {
                 size: ctx.text_size,
                 color: ctx.default_color,
                 ..Default::default()
             });
 
+            let num_lines: usize = ctx.text.lines().count();
+
             let (w, _) = win.rich_text_size(&[span.clone()]).into();
             taffy_style.size = Size {
                 width: length(w),
-                height: length(ctx.text_size * 1.3),
+                height: length((ctx.text_size * TEXT_MULTIPLIER) * num_lines as f32),
             };
 
             taffy_style.box_sizing = taffy::style::BoxSizing::ContentBox;

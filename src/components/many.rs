@@ -9,7 +9,7 @@ use crate::{styling::{DisplayType::{self, Flex}, SenStyle}, views::{Component, E
 pub struct Many {
     id: Mutex<Option<SenId>>,
     views: Arc<Vec<View>>,
-    pub(crate) style: SenStyle,
+    pub(crate) style: Mutex<SenStyle>,
 }
 
 /*
@@ -25,30 +25,49 @@ pub struct Many {
  */
 impl Many {
     pub fn new(v: Vec<View>) -> Self {
+        let mut tffy: taffy::Style<String> = taffy::Style::default();
+        tffy.align_self = Some(AlignSelf::STRETCH);
+
         let mut r = SenStyle {
             verdant: Default::default(),
+            taffy: Arc::new(Mutex::new(tffy)),
             ..Default::default()
         };
-
-        r.taffy.align_self = Some(AlignSelf::STRETCH);
 
         Self {
             id: Mutex::new(None),
             views: Arc::new(v),
-            style: r,
+            style: Mutex::new(r),
         }
     }
 
     pub fn display(mut self, tp: DisplayType) -> Self {
-        match tp {
-            DisplayType::Flex(d) => {
-                self.style.taffy.display = Display::Flex;
-                self.style.taffy.flex_direction = d;
-            },
-            DisplayType::Grid() => {
+        match self.style.lock() {
+            Ok(val) => {
+                match tp {
+                    DisplayType::Flex(d) => {
+                        val.taffy().display = Display::Flex;
+                        val.taffy().flex_direction = d;
+                    },
+                    DisplayType::Grid() => {
 
+                    },
+                }
             },
-        }
+            Err(e) => {
+                let val = e.into_inner();
+                match tp {
+                    DisplayType::Flex(d) => {
+                        val.taffy().display = Display::Flex;
+                        val.taffy().flex_direction = d;
+                    },
+                    DisplayType::Grid() => {
+
+                    },
+                }
+            }
+        };
+
 
         self
     }
@@ -84,11 +103,17 @@ impl Component for Many {
     }
 
     fn get_inner(&self) -> Option<Arc<Vec<View>>> {
-        return Some(self.views.clone());
+        Some(self.views.clone())
     }
 
     fn get_style(&self) -> SenStyle {
-        self.style.clone()
+        match self.style.lock() {
+            Ok(val) => val.clone(),
+            Err(e) => {
+                let val = e.into_inner();
+                val.clone()
+            }
+        }
     }
 
     fn render(&self, window: &mut WindowDraw, tree: &mut TaffyTree, offset: Vec2, chan: Arc<Sender<View>>) {

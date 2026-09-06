@@ -1,3 +1,6 @@
+
+use std::{cell::RefCell, sync::{Arc, Mutex, MutexGuard, RwLock}};
+
 use taffy::{AlignSelf, FlexDirection, Style};
 use verdant::vec::Vec2;
 
@@ -6,7 +9,29 @@ use verdant::vec::Vec2;
 pub struct SenStyle {
     pub verdant: Option<verdant::shapes::Style>,
     pub offset: Option<Vec2>,
-    pub taffy: taffy::Style<String>,
+    pub taffy: Arc<Mutex<taffy::Style<String>>>,
+}
+
+impl SenStyle {
+    pub fn taffy(self: &MutexGuard<'_, SenStyle>) -> MutexGuard<'_, Style<String>> {
+        match self.taffy.lock() {
+            Ok(val) => val,
+            Err(e) => e.into_inner(),
+        }
+    }
+}
+
+unsafe impl Send for SenStyle {}
+unsafe impl Sync for SenStyle {}
+
+impl Default for SenStyle {
+    fn default() -> Self {
+        Self {
+            verdant: Some(Default::default()),
+            offset: None,
+            taffy: Arc::new(Mutex::new(Default::default()))
+        }
+    }
 }
 
 pub enum DisplayType {
@@ -66,7 +91,7 @@ impl Default for SenStyle {
         SenStyle {
             verdant: None,
             offset: None,
-            taffy: t,
+            taffy: Arc::new(Mutex::new(t)),
         }
     }
 }

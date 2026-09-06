@@ -1,21 +1,24 @@
 use std::sync::{Arc, Mutex, RwLock, mpsc::Sender};
 
 use taffy::{AlignSelf, Size, TaffyTree, style_helpers::length};
-use verdant::{shapes::{Drawable, Rect, Style}, types::Color, vec::Vec2, window::WindowDraw};
+use verdant::{event::Key, shapes::{Drawable, Rect, Style}, types::Color, vec::Vec2, window::WindowDraw};
 
 use crate::{styling::{DisplayType, Margin, Padding, SenStyle}, ui::SenWindow, views::{Component, Events, Id, SenId, Stylable, View}};
 
 fn default_style() -> SenStyle {
-    let mut r = SenStyle {
+    let mut tffy: taffy::Style<String> = taffy::Style::default();
+    tffy.align_self = Some(AlignSelf::STRETCH);
+
+    let r = SenStyle {
         verdant: Some(Style {
             fill_color: Color::BLACK,
             ..Default::default()
         }),
+        taffy: Arc::new(Mutex::new(tffy)),
         offset: None,
         ..Default::default()
     };
 
-    r.taffy.align_self = Some(AlignSelf::STRETCH);
 
     r
 }
@@ -24,7 +27,8 @@ pub struct Div {
     id: Mutex<Option<SenId>>,
     inner: Arc<Vec<View>>,
     style: Mutex<SenStyle>,
-    on_click: Option<Box<dyn Fn()>>,
+    on_click: Option<Box<dyn Fn() + Send + Sync>>,
+    on_key_down: Option<Box<dyn Fn(Key) + Send + Sync>>,
 }
 
 impl Div {
@@ -34,11 +38,17 @@ impl Div {
             inner: Arc::new(vec![children.as_view()]),
             style: Mutex::new(default_style()),
             on_click: None,
+            on_key_down: None,
         }
     }
 
-    pub fn on_click(mut self, fun: impl Fn() + 'static) -> Self {
+    pub fn on_click(mut self, fun: impl Fn() + 'static + Send + Sync) -> Self {
         self.on_click = Some(Box::new(fun));
+        self
+    }
+
+    pub fn on_key_down(mut self, fun: impl Fn(Key) + 'static + Send + Sync) -> Self {
+        self.on_key_down = Some(Box::new(fun));
         self
     }
 }
@@ -112,7 +122,7 @@ impl Stylable for Div {
     fn size(mut self, size: Vec2) -> Self {
         match self.style.lock() {
             Ok(mut val) => {
-                val.taffy.size = taffy::Size {
+                val.taffy().size = taffy::Size {
                     width: length(size.x),
                     height: length(size.y),
                 };
@@ -120,7 +130,7 @@ impl Stylable for Div {
             Err(e) => {
                 let mut val = e.into_inner();
 
-                val.taffy.size = taffy::Size {
+                val.taffy().size = taffy::Size {
                     width: length(size.x),
                     height: length(size.y),
                 };
@@ -157,7 +167,7 @@ impl Stylable for Div {
     fn align_self(self, slf: AlignSelf) -> Self {
         match self.style.lock().ok() {
             Some(mut s) => {
-                s.taffy.align_self = Some(slf);
+                s.taffy().align_self = Some(slf);
             },
             None => {},
         }
@@ -170,7 +180,7 @@ impl Stylable for Div {
             Some(mut style) => {
                 match pad {
                     Padding::All { t, r, b, l } => {
-                        style.taffy.padding = taffy::Rect {
+                        style.taffy().padding = taffy::Rect {
                             left: length(l),
                             right: length(r),
                             top: length(t),
@@ -178,16 +188,16 @@ impl Stylable for Div {
                         };
                     },
                     Padding::Top { t } => {
-                        style.taffy.padding.top = length(t);
+                        style.taffy().padding.top = length(t);
                     },
                     Padding::Bottom { b } => {
-                        style.taffy.padding.bottom = length(b);
+                        style.taffy().padding.bottom = length(b);
                     },
                     Padding::Left { l } => {
-                        style.taffy.padding.left = length(l);
+                        style.taffy().padding.left = length(l);
                     },
                     Padding::Right { r } => {
-                        style.taffy.padding.right = length(r);
+                        style.taffy().padding.right = length(r);
                     }
                 }
             }
@@ -202,7 +212,7 @@ impl Stylable for Div {
             Some(mut style) => {
                 match mar {
                     Margin::All { t, r, b, l } => {
-                        style.taffy.margin = taffy::Rect {
+                        style.taffy().margin = taffy::Rect {
                             left: length(l),
                             right: length(r),
                             top: length(t),
@@ -210,16 +220,16 @@ impl Stylable for Div {
                         };
                     },
                     Margin::Top { t } => {
-                        style.taffy.margin.top = length(t);
+                        style.taffy().margin.top = length(t);
                     },
                     Margin::Bottom { b } => {
-                        style.taffy.margin.bottom = length(b);
+                        style.taffy().margin.bottom = length(b);
                     },
                     Margin::Left { l } => {
-                        style.taffy.margin.left = length(l);
+                        style.taffy().margin.left = length(l);
                     },
                     Margin::Right { r } => {
-                        style.taffy.margin.right = length(r);
+                        style.taffy().margin.right = length(r);
                     }
                 }
             }
@@ -274,6 +284,7 @@ impl Events for Div {
     fn drag_over(&self, view: Option<View>) {}
 
     fn key_down(&self, key: verdant::prelude::Key) {
-
+        let Some(c) = &self.on_key_down else { return; };
+        c(key);
     }
 }

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, mpsc::Sender};
+use std::sync::{Arc, Mutex, mpsc::Sender, nonpoison::MutexGuard};
 use taffy::{AlignSelf, FlexDirection, NodeId, Style, TaffyTree};
 use verdant::{event::Key, text::Font, types::Color, vec::Vec2, window::WindowDraw};
 
@@ -64,12 +64,12 @@ impl Events for () {
 }
 
 // this comment makes things more readable :)
-pub trait Component: Id + Events {
+pub trait Component: Id + Events + Send + Sync {
     fn as_view(self) -> View;
     fn get_inner(&self) -> Option<Arc<Vec<View>>>;
     fn render(&self, window: &mut WindowDraw, tree: &mut TaffyTree, offset: Vec2, chan: Arc<Sender<View>>);
 
-    fn get_style(&self) -> SenStyle;
+    fn get_style(&self) -> MutexGuard<'_, SenStyle>;
     fn get_ctx(&self) -> Option<RenderCtx> {
         None
     }
@@ -85,7 +85,11 @@ impl Component for () {
     }
 
     fn render(&self, window: &mut WindowDraw, tree: &mut TaffyTree, offset: Vec2, chan: Arc<Sender<View>>) { }
-    fn get_style(&self) -> SenStyle {
-        Default::default()
+    fn get_style(&self) -> MutexGuard<'_, SenStyle> {
+        let stle: SenStyle = Default::default();
+        match std::sync::nonpoison::Mutex::new(stle).lock() {
+            Ok(v) => v,
+            Err(e) => e.into_inner(),
+        }
     }
 }

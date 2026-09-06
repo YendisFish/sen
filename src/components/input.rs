@@ -1,21 +1,23 @@
 use std::{fmt::format, panic, sync::{Arc, Mutex, mpsc::Sender}};
 
 use taffy::{AlignSelf, Size, TaffyTree, style_helpers::length};
-use verdant::{event::winit::NamedKey::Dead, text::Font, types::Color, vec::Vec2, window::WindowDraw};
+use verdant::{event::{Key, winit::NamedKey::Dead}, text::Font, types::Color, vec::Vec2, window::WindowDraw};
 
 use crate::{components::{bind::State, div::Div, many::Many, text::Text}, many, styling::{DisplayType, Margin, Padding, SenStyle}, views::{Component, Events, Id, SenId, Stylable, View}};
 
 fn default_style() -> SenStyle {
-    let mut ret = SenStyle {
-        verdant: Some(Default::default()),
-        offset: None,
-        taffy: Default::default()
-    };
-
-    ret.taffy.size = Size {
+    let mut tffy: taffy::Style<String> = taffy::Style::default();
+    tffy.size = Size {
         width: length(200.),
         height: length(30.)
     };
+
+    let ret = SenStyle {
+        verdant: Some(Default::default()),
+        offset: None,
+        taffy: Arc::new(Mutex::new(tffy))
+    };
+
 
     ret
 }
@@ -25,6 +27,7 @@ pub struct Input {
     data: Arc<State<String>>,
     style: Arc<Mutex<SenStyle>>,
     font: Font,
+    on_submit: Option<Box<dyn Fn(Arc<State<String>>) + Send + Sync>>,
 }
 
 impl Input {
@@ -36,44 +39,67 @@ impl Input {
             data: state.unwrap_or(State::new(String::new())),
             style: Arc::new(Mutex::new(default_style())),
             font: font,
+            on_submit: None,
         };
 
-
         let style_arc = ret.style.clone();
+
         ret.data.with(move |dat| {
-            let (width, height, color) = match style_arc.lock() {
+            let (width, height, color, outline_color, outline_size) = match style_arc.lock() {
                 Ok(val) => (
-                    val.taffy.size.width.value(),
-                    val.taffy.size.height.value(),
+                    val.taffy().size.width.value(),
+                    val.taffy().size.height.value(),
                     match val.verdant {
                         Some(v) => v.fill_color,
                         None => default_style().verdant.unwrap().fill_color,
-                    }
+                    },
+                    match val.verdant {
+                        Some(v) => v.outline_color,
+                        None => default_style().verdant.unwrap().outline_color,
+                    },
+                    match val.verdant {
+                        Some(v) => v.outline_width,
+                        None => default_style().verdant.unwrap().outline_width,
+                    },
                 ),
                 Err(e) => {
                     let val = e.into_inner();
                     (
-                        val.taffy.size.height.value(),
-                        val.taffy.size.width.value(),
+                        val.taffy().size.height.value(),
+                        val.taffy().size.width.value(),
                         match val.verdant {
                             Some(v) => v.fill_color,
                             None => default_style().verdant.unwrap().fill_color,
-                        }
+                        },
+                        match val.verdant {
+                            Some(v) => v.outline_color,
+                            None => default_style().verdant.unwrap().outline_color,
+                        },
+                        match val.verdant {
+                            Some(v) => v.outline_width,
+                            None => default_style().verdant.unwrap().outline_width,
+                        },
                     )
                 }
             };
 
-            Div::new(
+            let dv = Div::new(
                 Text::new(dat.clone(), m_font.clone()).text_size(height / 1.3)
             )
             .color(color)
-            .outline(Color::BLACK, 8.)
             .align_self(AlignSelf::STRETCH)
             .size(Vec2::new(width, height))
-            .as_view()
+            .outline(outline_color, outline_size);
+
+            dv.as_view()
         });
 
         ret
+    }
+
+    pub fn on_submit(mut self, fun: impl Fn(Arc<State<String>>) + 'static + Send + Sync) -> Self {
+        self.on_submit = Some(Box::new(fun));
+        self
     }
 }
 
@@ -113,6 +139,10 @@ impl Events for Input {
                 old_data.pop();
                 _ = self.data.set(old_data);
             }
+            verdant::prelude::Key::Enter => {
+                let Some(c) = &self.on_submit else { return; };
+                c(self.data.clone());
+            },
             _ => {},
         }
     }
@@ -157,7 +187,7 @@ impl Stylable for Input {
     fn size(self, size: Vec2) -> Self {
         match self.style.lock() {
             Ok(mut val) => {
-                val.taffy.size = taffy::Size {
+                val.taffy().size = taffy::Size {
                     width: length(size.x),
                     height: length(size.y),
                 };
@@ -165,7 +195,7 @@ impl Stylable for Input {
             Err(e) => {
                 let mut val = e.into_inner();
 
-                val.taffy.size = taffy::Size {
+                val.taffy().size = taffy::Size {
                     width: length(size.x),
                     height: length(size.y),
                 };
@@ -205,7 +235,7 @@ impl Stylable for Input {
     fn align_self(self, slf: AlignSelf) -> Self {
         match self.style.lock().ok() {
             Some(mut s) => {
-                s.taffy.align_self = Some(slf);
+                s.taffy().align_self = Some(slf);
             },
             None => {},
         }
@@ -219,7 +249,7 @@ impl Stylable for Input {
             Some(mut style) => {
                 match pad {
                     Padding::All { t, r, b, l } => {
-                        style.taffy.padding = taffy::Rect {
+                        style.taffy().padding = taffy::Rect {
                             left: length(l),
                             right: length(r),
                             top: length(t),
@@ -227,16 +257,16 @@ impl Stylable for Input {
                         };
                     },
                     Padding::Top { t } => {
-                        style.taffy.padding.top = length(t);
+                        style.taffy().padding.top = length(t);
                     },
                     Padding::Bottom { b } => {
-                        style.taffy.padding.bottom = length(b);
+                        style.taffy().padding.bottom = length(b);
                     },
                     Padding::Left { l } => {
-                        style.taffy.padding.left = length(l);
+                        style.taffy().padding.left = length(l);
                     },
                     Padding::Right { r } => {
-                        style.taffy.padding.right = length(r);
+                        style.taffy().padding.right = length(r);
                     }
                 }
             }
@@ -252,7 +282,7 @@ impl Stylable for Input {
             Some(mut style) => {
                 match mar {
                     Margin::All { t, r, b, l } => {
-                        style.taffy.margin = taffy::Rect {
+                        style.taffy().margin = taffy::Rect {
                             left: length(l),
                             right: length(r),
                             top: length(t),
@@ -260,16 +290,16 @@ impl Stylable for Input {
                         };
                     },
                     Margin::Top { t } => {
-                        style.taffy.margin.top = length(t);
+                        style.taffy().margin.top = length(t);
                     },
                     Margin::Bottom { b } => {
-                        style.taffy.margin.bottom = length(b);
+                        style.taffy().margin.bottom = length(b);
                     },
                     Margin::Left { l } => {
-                        style.taffy.margin.left = length(l);
+                        style.taffy().margin.left = length(l);
                     },
                     Margin::Right { r } => {
-                        style.taffy.margin.right = length(r);
+                        style.taffy().margin.right = length(r);
                     }
                 }
             }

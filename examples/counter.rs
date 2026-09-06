@@ -36,12 +36,11 @@ fn App() -> impl Component {
                 _ = s.set(val + 1);
             }))
         ).margin(Margin::Top { t: 10. }).color(Color::TRANSPARENT),
-        Input::new(font_clone, None).size(Vec2::new(500., 50.)),
     ].display(DisplayType::Flex(FlexDirection::Column))).color(Color::WHITE).size(Vec2::new(1920., 1080.))
 }
 
 #[allow(non_snake_case)]
-fn Button(text: impl Into<String>, fun: impl Fn() + 'static) -> Arc<State<(String, Color)>> {
+fn Button(text: impl Into<String>, fun: impl Fn() + 'static + Send + Sync) -> Arc<State<(String, Color)>> {
     let font = Font::load("/System/Library/Fonts/SFNS.ttf").unwrap();
     let state = State::new((text.into(), Color::WHITE));
 

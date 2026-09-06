@@ -1,3 +1,6 @@
+#![feature(arbitrary_self_types)]
+#![feature(nonpoison_mutex)]
+
 pub mod ui;
 pub mod views;
 pub mod components;

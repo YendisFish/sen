@@ -5,6 +5,8 @@ use verdant::{render_surface::RenderSurface, text::{Font, RichText, Span, TextSt
 
 use crate::{styling::{DisplayType, Margin, Padding, SenStyle}, views::{Component, Events, Id, RenderCtx, SenId, Stylable, View}};
 
+pub const TEXT_MULTIPLIER: f32 = 1.18;
+
 pub struct Text {
     id: Mutex<Option<SenId>>,
     text: String,
@@ -135,7 +137,7 @@ impl Component for Arc<Text> {
 
 impl Stylable for Arc<Text> {
     fn size(mut self, size: Vec2) -> Self {
-        return self;
+        self.text_size(size.y / TEXT_MULTIPLIER)
     }
 
     fn color(self, color: verdant::prelude::Color) -> Self {
@@ -165,7 +167,7 @@ impl Stylable for Arc<Text> {
     fn align_self(self, slf: AlignSelf) -> Self {
         match self.style.lock().ok() {
             Some(mut s) => {
-                s.taffy.align_self = Some(slf);
+                s.taffy().align_self = Some(slf);
             },
             None => {},
         }
@@ -178,7 +180,7 @@ impl Stylable for Arc<Text> {
             Some(mut style) => {
                 match pad {
                     Padding::All { t, r, b, l } => {
-                        style.taffy.padding = taffy::Rect {
+                        style.taffy().padding = taffy::Rect {
                             left: length(l),
                             right: length(r),
                             top: length(t),
@@ -186,16 +188,16 @@ impl Stylable for Arc<Text> {
                         };
                     },
                     Padding::Top { t } => {
-                        style.taffy.padding.top = length(t);
+                        style.taffy().padding.top = length(t);
                     },
                     Padding::Bottom { b } => {
-                        style.taffy.padding.bottom = length(b);
+                        style.taffy().padding.bottom = length(b);
                     },
                     Padding::Left { l } => {
-                        style.taffy.padding.left = length(l);
+                        style.taffy().padding.left = length(l);
                     },
                     Padding::Right { r } => {
-                        style.taffy.padding.right = length(r);
+                        style.taffy().padding.right = length(r);
                     }
                 }
             }
@@ -210,7 +212,7 @@ impl Stylable for Arc<Text> {
             Some(mut style) => {
                 match mar {
                     Margin::All { t, r, b, l } => {
-                        style.taffy.margin = taffy::Rect {
+                        style.taffy().margin = taffy::Rect {
                             left: length(l),
                             right: length(r),
                             top: length(t),
@@ -218,16 +220,16 @@ impl Stylable for Arc<Text> {
                         };
                     },
                     Margin::Top { t } => {
-                        style.taffy.margin.top = length(t);
+                        style.taffy().margin.top = length(t);
                     },
                     Margin::Bottom { b } => {
-                        style.taffy.margin.bottom = length(b);
+                        style.taffy().margin.bottom = length(b);
                     },
                     Margin::Left { l } => {
-                        style.taffy.margin.left = length(l);
+                        style.taffy().margin.left = length(l);
                     },
                     Margin::Right { r } => {
-                        style.taffy.margin.right = length(r);
+                        style.taffy().margin.right = length(r);
                     }
                 }
             }
