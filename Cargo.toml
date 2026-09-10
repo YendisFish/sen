@@ -3,9 +3,4 @@ name = "sen"
 version = "0.1.0"
 edition = "2024"
 
-[profile.release]
-debug = true
-
 [dependencies]
-taffy = "0.13.0"
-verdant = "0.9.0"
