@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+flume = { git = "https://codeberg.org/yendy/flume", version = "0.1.0" }
+verdant = "0.9.0"
