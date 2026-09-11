@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::{Arc, Mutex}};
+use std::{rc::Rc, sync::{Arc, Mutex, OnceLock}};
 
 use flume::{FlumeElem, FlumeNode, PassCtx, Size, layout};
 use verdant::{render_surface::RenderSurface, shapes::{Drawable, Rect}, types::Color, vec, window::WindowDraw};
@@ -17,6 +17,7 @@ fn default_style() -> SenStyle {
 }
 
 pub struct Div {
+    id: Mutex<Option<usize>>,
     style: SenStyle,
     children: Vec<Component>,
 }
@@ -24,6 +25,7 @@ pub struct Div {
 impl Div {
     pub fn new(c: Vec<Component>) -> Rc<Self> {
         Rc::new(Self {
+            id: Mutex::new(None),
             style: default_style(),
             children: c,
         })
@@ -48,6 +50,10 @@ impl View for Div {
         }
     }
 
+    fn get_children(&self) -> Vec<Component> {
+        self.children.clone()
+    }
+
     fn get_style(&self) -> SenStyle {
         self.style.clone()
     }
@@ -63,6 +69,23 @@ impl View for Div {
     fn color(self: Rc<Self>, color: Color) -> Component {
         self.style.verdant().fill(color);
         self.clone()
+    }
+
+    fn get_id(self: Rc<Self>) -> Option<usize> {
+        match self.id.lock() {
+            Ok(val) => *val,
+            Err(e) => *e.into_inner(),
+        }
+    }
+
+    fn set_id(self: Rc<Self>, id: usize) {
+        match self.id.lock() {
+            Ok(mut val) => *val = Some(id),
+            Err(e) => {
+                let mut val = e.into_inner();
+                *val = Some(id);
+            }
+        }
     }
 }
 

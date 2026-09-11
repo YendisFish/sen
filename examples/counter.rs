@@ -7,7 +7,7 @@ use verdant::{Renderer, types::Color};
 fn main() -> Result<(), Error> {
     let mut renderer = Renderer::new().unwrap();
     let window = renderer.create_window("Sen Counter", 1920, 1080);
-    let sen = Sen::new(window, Size::take(1920., 1080.));
+    let mut sen = Sen::new(window, Size::take(1920., 1080.));
 
     sen.start(&mut renderer, App());
 
