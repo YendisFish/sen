@@ -3,7 +3,7 @@ use std::{rc::Rc, sync::{Arc, Mutex, OnceLock}};
 use flume::{FlumeElem, FlumeNode, PassCtx, Size, layout};
 use verdant::{render_surface::RenderSurface, shapes::{Drawable, Rect}, types::Color, vec, window::WindowDraw};
 
-use crate::{style::SenStyle, view::{Component, View}};
+use crate::{style::SenStyle, view::{Component, Stateful, View}};
 
 fn default_style() -> SenStyle {
     let stl = SenStyle::new();
@@ -87,13 +87,17 @@ impl View for Div {
             }
         }
     }
+
+    fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>> {
+        None
+    }
 }
 
 impl FlumeNode for Div {
-    fn get_children_nodes(&self, n: usize) -> Option<&dyn FlumeNode> {
+    fn get_children_nodes(&self, n: usize) -> Option<Rc<dyn FlumeNode>> {
         match self.children.get(n) {
-            Some(e) => Some(e.as_ref()),
-            None => None::<&dyn FlumeNode>,
+            Some(e) => Some(e.clone() as Rc<dyn FlumeNode>),
+            None => None,
         }
     }
 

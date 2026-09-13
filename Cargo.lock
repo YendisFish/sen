@@ -370,7 +370,7 @@ dependencies = [
 [[package]]
 name = "flume"
 version = "0.1.0"
-source = "git+https://codeberg.org/yendy/flume#d4cc553094b82dd88706b448922a92ffdc69c7a9"
+source = "git+https://codeberg.org/yendy/flume#cd9ea21bf941983415da5f0aeb2ea655014c4337"
 
 [[package]]
 name = "foldhash"

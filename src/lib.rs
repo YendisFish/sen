@@ -47,6 +47,12 @@ impl Sen {
             }
 
             if let Some(mut win) = renderer.get_window(self.window) {
+                while let Some(msg) = self.channel.reciever.recv().ok() {
+                    // get child from arena
+                    // check if child is stateful
+                    // if stateful remove all previous children from arena and regenerate component children
+                    // if not stateful (also do this after regenerating stateful children) recompute layout
+                }
                 if init {
                     let mut ctx = PassCtx::from_root(root.as_ref());
                     root.render(&mut win, &mut ctx);
@@ -78,7 +84,7 @@ impl Sen {
             _ => {},
         }
 
-        let r = match compute(component.clone().as_ref(), avail, false) {
+        let r = match compute(component.clone().as_ref(), avail, false, None) {
             Ok(v) => v,
             Err(_) => false,
         };

@@ -5,6 +5,10 @@ use verdant::{render_surface::RenderSurface, types::Color, window::WindowDraw};
 
 use crate::style::SenStyle;
 
+pub trait Stateful {
+    fn generate_children(&self) -> Vec<Component>;
+}
+
 pub type Component = Rc<dyn View>;
 pub trait View: FlumeNode {
     fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx);
@@ -18,6 +22,9 @@ pub trait View: FlumeNode {
     //id
     fn get_id(self: Rc<Self>) -> Option<usize>;
     fn set_id(self: Rc<Self>, id: usize);
+
+    //for state specifically
+    fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>>;
 }
 
 impl View for () {
@@ -43,4 +50,8 @@ impl View for () {
     }
 
     fn set_id(self: Rc<Self>, id: usize) { }
+
+    fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>> {
+        None
+    }
 }
