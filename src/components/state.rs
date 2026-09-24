@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::{Arc, Mutex, OnceLock, mpsc::Sender}};
+use std::{rc::Rc, sync::{Arc, Mutex, MutexGuard, OnceLock, mpsc::Sender,}};
 
 use flume::{FlumeElem, FlumeNode, PassCtx, Size, layout};
 use verdant::{types::Color, window::WindowDraw};
@@ -95,6 +95,16 @@ impl<T: Send + Sync + 'static> State<T> {
         });
     }
 
+    pub fn get(self: &Rc<Self>) -> MutexGuard<'_, T> {
+        match self.hook.lock() {
+            Ok(val) => val,
+            Err(e) => {
+                let val = e.into_inner();
+                val
+            }
+        }
+    }
+
     pub fn as_handle(self: &Rc<Self>) -> Option<StateHandle<T>> {
         let id_opt = match self.id.lock() {
             Ok(i) => *i,
@@ -113,14 +123,16 @@ impl<T: Send + Sync + 'static> State<T> {
 }
 
 impl<T: Send + Sync + 'static> View for State<T> {
-    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx) {
+    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx, sender: Arc<Sender<SenNotif>>) {
+        _ = self.channel.set(sender.clone());
+
         let children_current = ctx.clone();
-        layout(ctx, self);
+        layout(ctx, self, true);
 
         let mut n_ctx = self.ctx(Some(&children_current));
 
         for c in self.get_children().iter() {
-            c.render(surface, &mut n_ctx);
+            c.render(surface, &mut n_ctx, sender.clone());
         }
     }
 
@@ -168,6 +180,8 @@ impl<T: Send + Sync + 'static> View for State<T> {
     fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>> {
         return Some(self as Rc<dyn Stateful>);
     }
+
+    fn click(self: Rc<Self>) { }
 }
 
 impl<T: Send + Sync + 'static> FlumeNode for State<T> {
@@ -200,6 +214,18 @@ impl<T: Send + Sync + 'static> Stateful for State<T> {
         match self.generator.get() {
             Some(fun) => fun(&val),
             None => vec![],
+        }
+    }
+
+    fn set_children(&self, chil: Vec<Component>) {
+        match self.children.lock() {
+            Ok(mut v) => {
+                *v = chil;
+            },
+            Err(e) => {
+                let mut v = e.into_inner();
+                *v = chil;
+            }
         }
     }
 }

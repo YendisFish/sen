@@ -1,17 +1,18 @@
-use std::{rc::Rc};
+use std::{rc::Rc, sync::{Arc, mpsc::Sender}};
 
 use flume::{Direction, FlumeElem, FlumeNode, FlumeStyle, FlumeWrap, PassCtx, Size, Space};
 use verdant::{render_surface::RenderSurface, types::Color, window::WindowDraw};
 
-use crate::style::SenStyle;
+use crate::{SenNotif, style::SenStyle};
 
 pub trait Stateful {
     fn generate_children(&self) -> Vec<Component>;
+    fn set_children(&self, chil: Vec<Component>);
 }
 
 pub type Component = Rc<dyn View>;
 pub trait View: FlumeNode {
-    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx);
+    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx, sender: Arc<Sender<SenNotif>>);
     fn get_children(&self) -> Vec<Component>;
 
     // styling
@@ -25,10 +26,13 @@ pub trait View: FlumeNode {
 
     //for state specifically
     fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>>;
+
+    //events
+    fn click(self: Rc<Self>);
 }
 
 impl View for () {
-    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx) { }
+    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx, sender: Arc<Sender<SenNotif>>) { }
     fn get_children(&self) -> Vec<Component> {
         vec![]
     }
@@ -54,4 +58,6 @@ impl View for () {
     fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>> {
         None
     }
+
+    fn click(self: Rc<Self>) { }
 }

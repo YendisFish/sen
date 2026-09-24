@@ -1,9 +1,9 @@
-use std::{rc::Rc, sync::{Arc, Mutex, OnceLock}};
+use std::{rc::Rc, sync::{Arc, Mutex, OnceLock, mpsc::Sender}};
 
 use flume::{FlumeElem, FlumeNode, PassCtx, Size, layout};
 use verdant::{render_surface::RenderSurface, shapes::{Drawable, Rect}, types::Color, vec, window::WindowDraw};
 
-use crate::{style::SenStyle, view::{Component, Stateful, View}};
+use crate::{SenNotif, style::SenStyle, view::{Component, Stateful, View}};
 
 fn default_style() -> SenStyle {
     let stl = SenStyle::new();
@@ -20,6 +20,7 @@ pub struct Div {
     id: Mutex<Option<usize>>,
     style: SenStyle,
     children: Vec<Component>,
+    event_on_click: Mutex<Option<Box<dyn Fn()>>>,
 }
 
 impl Div {
@@ -28,14 +29,26 @@ impl Div {
             id: Mutex::new(None),
             style: default_style(),
             children: c,
+            event_on_click: Mutex::new(None),
         })
+    }
+
+    pub fn on_click(self: Rc<Self>, fun: impl Fn() + 'static) -> Rc<Self> {
+        let mut e_click = match self.event_on_click.lock() {
+            Ok(v) => v,
+            Err(e) => e.into_inner(),
+        };
+
+        *e_click = Some(Box::new(fun));
+
+        self.clone()
     }
 }
 
 impl View for Div {
-    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx) {
+    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx, sender: Arc<Sender<SenNotif>>) {
         let children_current = ctx.clone();
-        let l = layout(ctx, self);
+        let l = layout(ctx, self, true);
 
         let total = self.style.flume.style_with(|_, s| s.total_occupancy());
         let verd = self.style.verdant();
@@ -46,7 +59,7 @@ impl View for Div {
 
         let mut n_ctx = self.ctx(Some(&children_current));
         for c in self.children.iter() {
-            c.render(surface, &mut n_ctx);
+            c.render(surface, &mut n_ctx, sender.clone());
         }
     }
 
@@ -90,6 +103,21 @@ impl View for Div {
 
     fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>> {
         None
+    }
+
+    fn click(self: Rc<Self>) {
+        match self.event_on_click.lock() {
+            Ok(v) => {
+                if let Some(fun) = v.as_ref() {
+                    fun();
+                }
+            },
+            Err(e) => {
+                if let Some(fun) = e.into_inner().as_ref() {
+                    fun();
+                }
+            }
+        }
     }
 }
 

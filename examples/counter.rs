@@ -17,6 +17,7 @@ fn main() -> Result<(), Error> {
 #[allow(non_snake_case)]
 pub fn App() -> Component {
     let st = State::new(false);
+    let st_hand = st.clone();
     div![
         div!().size(Size::take(50., 200.)).color(Color::BLUE),
         div!().size(Size::take(50., 200.)).color(Color::GREEN),
@@ -29,5 +30,8 @@ pub fn App() -> Component {
                 }
             ]
         }).size(Size::wrap()),
-    ].size(Size::take(200., 200.))
+    ].on_click(move || {
+        let val = *st_hand.get();
+        st_hand.set(!val);
+    }).size(Size::take(200., 200.))
 }
