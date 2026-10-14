@@ -1,272 +1,105 @@
-use std::sync::{Arc, Mutex, OnceLock, mpsc::Sender};
+use std::{rc::Rc, sync::{Arc, Mutex, mpsc::Sender}};
 
-use taffy::{AlignSelf, Size, TaffyTree, style_helpers::length};
-use verdant::{render_surface::RenderSurface, text::{Font, RichText, Span, TextStyle}, transform::Transform2d, types::{ByteSource, Color}, vec::Vec2, window::WindowDraw};
+use flume::{FlumeElem, FlumeNode, PassCtx, layout};
+use verdant::{render_surface::RenderSurface, text::{Font, Span, TextStyle}, types::Color, window::WindowDraw};
 
-use crate::{styling::{DisplayType, Margin, Padding, SenStyle}, views::{Component, Events, Id, RenderCtx, SenId, Stylable, View}};
+use crate::{SenNotif, style::SenStyle, view::{Component, Stateful, View}};
 
-pub struct Text {
-    id: Mutex<Option<SenId>>,
-    text: String,
-    font: Font,
-    style: Mutex<SenStyle>,
-    size: Mutex<f32>,
+pub struct TextBox {
+    id: Mutex<Option<usize>>,
+    pub text: String,
+    pub font: Font,
+    pub style: SenStyle,
 }
 
-impl Text {
-    pub fn new(text: String, font: Font) -> Arc<Self> {
-        Arc::new(Self {
+impl TextBox {
+    pub fn new(text: impl Into<String>, font: Font) -> Rc<Self> {
+        Rc::new(Self {
             id: Mutex::new(None),
-            text: text,
+            text: text.into(),
+            style: SenStyle::new(),
             font: font,
-            style: Mutex::new(Default::default()),
-            size: Mutex::new(25.),
         })
     }
+}
 
-    pub fn text_size(self: Arc<Self>, size: f32) -> Arc<Self> {
-        match self.size.lock() {
-            Ok(mut val) => {
-                *val = size;
+impl View for TextBox {
+    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx, sender: Arc<Sender<SenNotif>>) {
+        let spans = &[
+            Span {
+                text: self.text.clone(),
+                font: self.font.clone(),
+                style: TextStyle {
+                    size: 32.,
+                    color: Color::WHITE,
+                    ..Default::default()
+                }
             },
+        ];
+
+        let (w, h) = surface.rich_text_size(spans).into();
+        self.style.flume.style_with(move |_, stle| {
+            stle.size.set_width(w);
+            stle.size.set_height(h);
+        });
+
+        let l = layout(ctx, self, true);
+
+        let container = ctx.inside_of.clone();
+        let (c_w, c_h) = container.style_with(|_, stle| (stle.size.width(), stle.size.height()));
+        let (r_w, r_h) = self.style.flume.style_with(move |_, stle| (stle.size.width(), stle.size.height()));
+        if !(r_w <= c_w && r_h <= c_h) {
+            eprintln!("Text \"{}\" overflowed container, displaying with warning.", self.text);
+            eprintln!("Text size: {}, {}", r_w, r_h);
+            eprintln!("Container size: {}, {}", c_w, c_h);
+        }
+
+        surface.rich_text(l.0, l.1, spans);
+    }
+
+    fn get_id(self: Rc<Self>) -> Option<usize> {
+        match self.id.lock() {
+            Ok(val) => *val,
+            Err(e) => *e.into_inner(),
+        }
+    }
+
+    fn set_id(self: Rc<Self>, id: usize) {
+        match self.id.lock() {
+            Ok(mut val) => *val = Some(id),
             Err(e) => {
                 let mut val = e.into_inner();
-                *val = size;
-            },
-        };
-
-        self
-    }
-}
-
-impl Events for Arc<Text> {
-    fn click(&self, set_focus: &mut bool) -> bool { false }
-    fn drag_over(&self, view: Option<View>) {}
-
-    fn key_down(&self, key: verdant::prelude::Key) {}
-}
-
-impl Id for Arc<Text> {
-    fn set_id(&self, id: SenId) {
-        let mut id_guard = match self.id.lock() {
-            Ok(guard) => guard,
-            Err(e) => e.into_inner(),
-        };
-
-        *id_guard = Some(id);
+                *val = Some(id);
+            }
+        }
     }
 
-    fn get_id(&self) -> Option<SenId> {
-        if let Some(id) = self.id.lock().ok() {
-           *id
-        } else { None }
-    }
-}
-
-impl Component for Arc<Text> {
-    fn as_view(self) -> View {
-        Arc::new(self)
-    }
-
-    fn get_inner(&self) -> Option<Arc<Vec<View>>> {
+    fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>> {
         None
     }
 
+    fn get_children(&self) -> Vec<Component> {
+        vec![]
+    }
+
+    fn click(self: Rc<Self>) { }
+
     fn get_style(&self) -> SenStyle {
-        match self.style.lock() {
-            Ok(val) => val.clone(),
-            Err(e) => {
-                let val = e.into_inner();
-                val.clone()
-            }
-        }
+        self.style.clone()
     }
 
-    fn render(&self, window: &mut WindowDraw, tree: &mut TaffyTree, offset: Vec2, chan: Arc<Sender<View>>) {
-        let Some(id) = self.get_id() else { return; };
-        let layout = match tree.layout(id.taffy) {
-            Ok(l) => l,
-            Err(_) => return,
-        };
-
-        let x = offset.x + layout.location.x + layout.padding.left;
-        let y = offset.y + layout.location.y + layout.padding.top;
-
-        let color = match self.style.lock() {
-            Ok(val) => match val.verdant {
-                Some(v) => v.fill_color,
-                None => Color::BLACK,
-            }
-            Err(e) => match e.into_inner().verdant {
-                Some(v) => v.fill_color,
-                None => Color::BLACK,
-            }
-        };
-
-        let Some(size) = self.size.lock().ok() else { return; };
-        let span = Span::new(self.text.clone(), self.font.clone(), TextStyle {
-            size: *size,
-            color: color,
-            ..Default::default()
-        });
-
-        let Some(mut style) = self.style.lock().ok() else { return; };
-        style.offset = Some(offset);
-
-        window.rich_text(x, y, &[span]);
-    }
-
-    fn get_ctx(&self) -> Option<RenderCtx> {
-        let color = match self.style.lock() {
-            Ok(val) => match val.verdant {
-                Some(v) => v.fill_color,
-                None => Color::BLACK,
-            }
-            Err(e) => match e.into_inner().verdant {
-                Some(v) => v.fill_color,
-                None => Color::BLACK,
-            }
-        };
-
-        let Some(size) = self.size.lock().ok() else { return None; };
-        Some(RenderCtx { text: self.text.clone(), text_size: *size, font: self.font.clone(), default_color: color })
-    }
+    fn color(self: Rc<Self>, color: Color) -> Component { self.clone() }
+    fn size(self: Rc<Self>, size: flume::Size) -> Component { self.clone() }
 }
 
-impl Stylable for Arc<Text> {
-    fn size(mut self, size: Vec2) -> Self {
-        return self;
+impl FlumeNode for TextBox {
+    fn get_children_nodes(&self, n: usize) -> Option<Rc<dyn FlumeNode>> { None }
+
+    fn ctx(&self, existing: Option<&PassCtx>) -> PassCtx {
+        self.style.flume.ctx(existing)
     }
 
-    fn color(self, color: verdant::prelude::Color) -> Self {
-        match self.style.lock() {
-            Ok(mut val) => {
-                let vd = val.verdant.get_or_insert_with(|| Default::default());
-                vd.fill(color);
-
-                val.verdant = Some(*vd);
-            },
-            Err(e) => {
-                let mut val = e.into_inner();
-                let vd = val.verdant.get_or_insert_with(|| Default::default());
-                vd.fill(color);
-
-                val.verdant = Some(*vd);
-            },
-        };
-
-        self
-    }
-
-    fn display(self, tp: DisplayType) -> Self {
-        self
-    }
-
-    fn align_self(self, slf: AlignSelf) -> Self {
-        match self.style.lock().ok() {
-            Some(mut s) => {
-                s.taffy.align_self = Some(slf);
-            },
-            None => {},
-        }
-
-        self
-    }
-
-    fn padding(self, pad: Padding) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match pad {
-                    Padding::All { t, r, b, l } => {
-                        style.taffy.padding = taffy::Rect {
-                            left: length(l),
-                            right: length(r),
-                            top: length(t),
-                            bottom: length(b)
-                        };
-                    },
-                    Padding::Top { t } => {
-                        style.taffy.padding.top = length(t);
-                    },
-                    Padding::Bottom { b } => {
-                        style.taffy.padding.bottom = length(b);
-                    },
-                    Padding::Left { l } => {
-                        style.taffy.padding.left = length(l);
-                    },
-                    Padding::Right { r } => {
-                        style.taffy.padding.right = length(r);
-                    }
-                }
-            }
-            None => {}
-        }
-
-        self
-    }
-
-    fn margin(self, mar: Margin) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match mar {
-                    Margin::All { t, r, b, l } => {
-                        style.taffy.margin = taffy::Rect {
-                            left: length(l),
-                            right: length(r),
-                            top: length(t),
-                            bottom: length(b)
-                        };
-                    },
-                    Margin::Top { t } => {
-                        style.taffy.margin.top = length(t);
-                    },
-                    Margin::Bottom { b } => {
-                        style.taffy.margin.bottom = length(b);
-                    },
-                    Margin::Left { l } => {
-                        style.taffy.margin.left = length(l);
-                    },
-                    Margin::Right { r } => {
-                        style.taffy.margin.right = length(r);
-                    }
-                }
-            }
-            None => {}
-        }
-
-        self
-    }
-
-    fn outline(self, color: Color, size: f32) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match &mut style.verdant {
-                    Some(v) => {
-                        v.outline_color = color;
-                        v.outline_width = size;
-                    },
-                    None => {},
-                }
-            },
-            None => {},
-        }
-
-        self
-    }
-
-    fn rounding(self, rounding: f32) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match &mut style.verdant {
-                    Some(v) => {
-                        v.corner_radius = rounding;
-                    },
-                    None => {},
-                }
-            },
-            None => {},
-        }
-
-        self
+    fn get_flume(&self) -> FlumeElem {
+        self.style.flume.clone()
     }
 }

@@ -1,63 +1,40 @@
-use std::{hash::Hash, io::Error, sync::Arc, time::Duration};
+use std::{io::Error, rc::Rc};
 
-use sen::{components::{bind::State, div::Div, input::Input, many::Many}, layout::Layout, styling::{DisplayType, Margin, Padding}, ui::SenWindow, views::{Component, Stylable, View}, *};
-use verdant::{vec, window};
+use flume::Size;
+use sen::{Sen, components::{div::Div, state::State, text::TextBox}, div, view::{Component, View}};
+use verdant::{Renderer, text::Font, types::Color};
 
 fn main() -> Result<(), Error> {
     let mut renderer = Renderer::new().unwrap();
-    let window = renderer.create_window("Counter", 1920, 1080);
-    let mut swin = SenWindow::new(window, Vec2::new(1920., 1080.));
+    let window = renderer.create_window("Sen Counter", 1920, 1080);
+    let mut sen = Sen::new(window, Size::take(1920., 1080.));
 
-    #[cfg(target_os =  "macos")]
-    {
-        swin.force_thread_timeout = Some(Duration::from_secs(1) / 60);
-    }
-
-    swin.start(&mut renderer, &mut App().as_view());
+    sen.start(&mut renderer, App());
 
     Ok(())
 }
 
 #[allow(non_snake_case)]
-fn App() -> impl Component {
+pub fn App() -> Component {
+    let st = State::new(0);
+    let st_hand = st.clone();
+
     let font = Font::load("/System/Library/Fonts/SFNS.ttf").unwrap();
-    let font_clone = font.clone();
-    let s = State::new(0);
-    Div::new(many![
-        s.with(move |val| {
-            sen::components::text::Text::new(val.to_string(), font.clone())
-                .text_size(25.)
-                .padding(Padding::Top { t: 20. })
-                .as_view()
+    div![
+        st.with(move |val| {
+            TextBox::new(val.to_string(), font.clone())
+        }).size(Size::take(50., 25.)),
+        Button("Click me!", move || {
+            let st_val = st_hand.get().clone();
+            _ = st_hand.set(st_val + 1);
         }),
-        Div::new(
-            Button("Click Me!", enclose!([s] move || {
-                let val = *s.get();
-                _ = s.set(val + 1);
-            }))
-        ).margin(Margin::Top { t: 10. }).color(Color::TRANSPARENT),
-        Input::new(font_clone, None).size(Vec2::new(500., 50.)),
-    ].display(DisplayType::Flex(FlexDirection::Column))).color(Color::WHITE).size(Vec2::new(1920., 1080.))
+    ].size(Size::take(1920., 1080.))
 }
 
 #[allow(non_snake_case)]
-fn Button(text: impl Into<String>, fun: impl Fn() + 'static) -> Arc<State<(String, Color)>> {
+pub fn Button(text: impl Into<String>, on_click: impl Fn() + 'static) -> Component {
     let font = Font::load("/System/Library/Fonts/SFNS.ttf").unwrap();
-    let state = State::new((text.into(), Color::WHITE));
-
-    let f = Arc::new(fun);
-    state.with(move |val| {
-        let fclone = f.clone();
-        Div::new(many![
-            sen::components::text::Text::new(val.0.clone(), font.clone())
-                .text_size(25.)
-                .padding(Padding::uniform(10.))
-        ])
-        .on_click(move || fclone.as_ref()())
-        .color(Color::AQUAMARINE)
-        .align_self(AlignSelf::FLEX_START)
-        .rounding(15.)
-        .outline(Color::BLACK, 5.)
-        .as_view()
-    })
+    div![
+        TextBox::new(text, font)
+    ].on_click(on_click).color(Color::RED).size(Size::take(175., 50.))
 }

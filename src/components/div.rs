@@ -1,279 +1,148 @@
-use std::sync::{Arc, Mutex, RwLock, mpsc::Sender};
+use std::{rc::Rc, sync::{Arc, Mutex, OnceLock, mpsc::Sender}};
 
-use taffy::{AlignSelf, Size, TaffyTree, style_helpers::length};
-use verdant::{shapes::{Drawable, Rect, Style}, types::Color, vec::Vec2, window::WindowDraw};
+use flume::{FlumeElem, FlumeNode, PassCtx, Size, layout};
+use verdant::{render_surface::RenderSurface, shapes::{Drawable, Rect}, types::Color, vec, window::WindowDraw};
 
-use crate::{styling::{DisplayType, Margin, Padding, SenStyle}, ui::SenWindow, views::{Component, Events, Id, SenId, Stylable, View}};
+use crate::{SenNotif, style::SenStyle, view::{Component, Stateful, View}};
 
 fn default_style() -> SenStyle {
-    let mut r = SenStyle {
-        verdant: Some(Style {
-            fill_color: Color::BLACK,
-            ..Default::default()
-        }),
-        offset: None,
-        ..Default::default()
-    };
+    let stl = SenStyle::new();
+    stl.verdant().fill(Color::BLACK);
 
-    r.taffy.align_self = Some(AlignSelf::STRETCH);
+    stl.flume.style_with(|_, fun| {
+        fun.size = Size::take(10., 10.);
+    });
 
-    r
+    stl
 }
 
 pub struct Div {
-    id: Mutex<Option<SenId>>,
-    inner: Arc<Vec<View>>,
-    style: Mutex<SenStyle>,
-    on_click: Option<Box<dyn Fn()>>,
+    id: Mutex<Option<usize>>,
+    style: SenStyle,
+    children: Vec<Component>,
+    event_on_click: Mutex<Option<Box<dyn Fn()>>>,
 }
 
 impl Div {
-    pub fn new(children: impl Component) -> Self {
-        Self {
+    pub fn new(c: Vec<Component>) -> Rc<Self> {
+        Rc::new(Self {
             id: Mutex::new(None),
-            inner: Arc::new(vec![children.as_view()]),
-            style: Mutex::new(default_style()),
-            on_click: None,
-        }
+            style: default_style(),
+            children: c,
+            event_on_click: Mutex::new(None),
+        })
     }
 
-    pub fn on_click(mut self, fun: impl Fn() + 'static) -> Self {
-        self.on_click = Some(Box::new(fun));
-        self
-    }
-}
-
-impl Id for Div {
-    fn set_id(&self, id: SenId) {
-        let mut id_guard = match self.id.lock() {
-            Ok(guard) => guard,
+    pub fn on_click(self: Rc<Self>, fun: impl Fn() + 'static) -> Rc<Self> {
+        let mut e_click = match self.event_on_click.lock() {
+            Ok(v) => v,
             Err(e) => e.into_inner(),
         };
 
-        *id_guard = Some(id);
-    }
+        *e_click = Some(Box::new(fun));
 
-    fn get_id(&self) -> Option<crate::views::SenId> {
-        if let Some(id) = self.id.lock().ok() {
-           *id
-        } else { None }
+        self.clone()
     }
 }
 
-impl Component for Div {
-    fn get_inner(&self) -> Option<Arc<Vec<View>>> {
-        Some(self.inner.clone())
-    }
+impl View for Div {
+    fn render(&self, surface: &mut WindowDraw, ctx: &mut PassCtx, sender: Arc<Sender<SenNotif>>) {
+        let children_current = ctx.clone();
+        let l = layout(ctx, self, true);
 
-    fn as_view(self) -> View {
-       Arc::new(self)
-    }
+        let total = self.style.flume.style_with(|_, s| s.total_occupancy());
+        let verd = self.style.verdant();
+        Rect::at(l.0, l.1)
+            .fill(verd.fill_color)
+            .size(total.width(), total.height())
+            .draw(surface);
 
-    fn render(&self, window: &mut WindowDraw, tree: &mut TaffyTree, mut offset: Vec2, chan: Arc<Sender<View>>) {
-        let Some(id) = self.get_id() else { return; };
-        let layout = match tree.layout(id.taffy) {
-            Ok(l) => l,
-            Err(_) => return,
-        };
-
-        let Some(mut style) = self.style.lock().ok() else { return; };
-        let verdant = match style.verdant {
-            Some(v) => v,
-            None => default_style().verdant.unwrap(),
-        };
-
-        let x = offset.x + layout.location.x;
-        let y = offset.y + layout.location.y;
-        Rect::at(x, y)
-            .fill(verdant.fill_color)
-            .size(layout.size.width, layout.size.height)
-            .corner_radius(verdant.corner_radius)
-            .outline(verdant.outline_color, verdant.outline_width)
-            .draw(window);
-
-        offset.x = x;
-        offset.y = y;
-
-        style.offset = Some(offset);
-        for c in self.inner.as_ref() {
-            c.render(window, tree, offset, chan.clone());
+        let mut n_ctx = self.ctx(Some(&children_current));
+        for c in self.children.iter() {
+            c.render(surface, &mut n_ctx, sender.clone());
         }
+    }
+
+    fn get_children(&self) -> Vec<Component> {
+        self.children.clone()
     }
 
     fn get_style(&self) -> SenStyle {
-        match self.style.lock() {
-            Ok(val) => val.clone(),
-            Err(e) => e.into_inner().clone(),
+        self.style.clone()
+    }
+
+    fn size(self: Rc<Self>, size: Size) -> Component {
+        self.style.flume.style_with(move |_, style| {
+            style.size = size;
+        });
+
+        self.clone()
+    }
+
+    fn color(self: Rc<Self>, color: Color) -> Component {
+        self.style.verdant().fill(color);
+        self.clone()
+    }
+
+    fn get_id(self: Rc<Self>) -> Option<usize> {
+        match self.id.lock() {
+            Ok(val) => *val,
+            Err(e) => *e.into_inner(),
+        }
+    }
+
+    fn set_id(self: Rc<Self>, id: usize) {
+        match self.id.lock() {
+            Ok(mut val) => *val = Some(id),
+            Err(e) => {
+                let mut val = e.into_inner();
+                *val = Some(id);
+            }
+        }
+    }
+
+    fn is_stateful(self: Rc<Self>) -> Option<Rc<dyn Stateful>> {
+        None
+    }
+
+    fn click(self: Rc<Self>) {
+        match self.event_on_click.lock() {
+            Ok(v) => {
+                if let Some(fun) = v.as_ref() {
+                    fun();
+                }
+            },
+            Err(e) => {
+                if let Some(fun) = e.into_inner().as_ref() {
+                    fun();
+                }
+            }
         }
     }
 }
 
-impl Stylable for Div {
-    fn size(mut self, size: Vec2) -> Self {
-        match self.style.lock() {
-            Ok(mut val) => {
-                val.taffy.size = taffy::Size {
-                    width: length(size.x),
-                    height: length(size.y),
-                };
-            },
-            Err(e) => {
-                let mut val = e.into_inner();
-
-                val.taffy.size = taffy::Size {
-                    width: length(size.x),
-                    height: length(size.y),
-                };
-            },
-        };
-
-        return self;
-    }
-
-    fn color(self, color: verdant::prelude::Color) -> Self {
-        match self.style.lock() {
-            Ok(mut val) => {
-                let vd = val.verdant.get_or_insert_with(|| default_style().verdant.unwrap());
-                vd.fill(color);
-
-                val.verdant = Some(*vd);
-            },
-            Err(e) => {
-                let mut val = e.into_inner();
-                let vd = val.verdant.get_or_insert_with(|| default_style().verdant.unwrap());
-                vd.fill(color);
-
-                val.verdant = Some(*vd);
-            },
-        };
-
-        self
-    }
-
-    fn display(self, tp: DisplayType) -> Self {
-        self
-    }
-
-    fn align_self(self, slf: AlignSelf) -> Self {
-        match self.style.lock().ok() {
-            Some(mut s) => {
-                s.taffy.align_self = Some(slf);
-            },
-            None => {},
+impl FlumeNode for Div {
+    fn get_children_nodes(&self, n: usize) -> Option<Rc<dyn FlumeNode>> {
+        match self.children.get(n) {
+            Some(e) => Some(e.clone() as Rc<dyn FlumeNode>),
+            None => None,
         }
-
-        self
     }
 
-    fn padding(self, pad: Padding) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match pad {
-                    Padding::All { t, r, b, l } => {
-                        style.taffy.padding = taffy::Rect {
-                            left: length(l),
-                            right: length(r),
-                            top: length(t),
-                            bottom: length(b)
-                        };
-                    },
-                    Padding::Top { t } => {
-                        style.taffy.padding.top = length(t);
-                    },
-                    Padding::Bottom { b } => {
-                        style.taffy.padding.bottom = length(b);
-                    },
-                    Padding::Left { l } => {
-                        style.taffy.padding.left = length(l);
-                    },
-                    Padding::Right { r } => {
-                        style.taffy.padding.right = length(r);
-                    }
-                }
-            }
-            None => {}
-        }
-
-        self
+    fn ctx(&self, existing: Option<&PassCtx>) -> PassCtx {
+        self.style.flume.ctx(existing)
     }
 
-    fn margin(self, mar: Margin) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match mar {
-                    Margin::All { t, r, b, l } => {
-                        style.taffy.margin = taffy::Rect {
-                            left: length(l),
-                            right: length(r),
-                            top: length(t),
-                            bottom: length(b)
-                        };
-                    },
-                    Margin::Top { t } => {
-                        style.taffy.margin.top = length(t);
-                    },
-                    Margin::Bottom { b } => {
-                        style.taffy.margin.bottom = length(b);
-                    },
-                    Margin::Left { l } => {
-                        style.taffy.margin.left = length(l);
-                    },
-                    Margin::Right { r } => {
-                        style.taffy.margin.right = length(r);
-                    }
-                }
-            }
-            None => {}
-        }
-
-        self
-    }
-
-    fn outline(self, color: Color, size: f32) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match &mut style.verdant {
-                    Some(v) => {
-                        v.outline_color = color;
-                        v.outline_width = size;
-                    },
-                    None => {},
-                }
-            },
-            None => {},
-        }
-
-        self
-    }
-
-    fn rounding(self, rounding: f32) -> Self {
-        match self.style.lock().ok() {
-            Some(mut style) => {
-                match &mut style.verdant {
-                    Some(v) => {
-                        v.corner_radius = rounding;
-                    },
-                    None => {},
-                }
-            },
-            None => {},
-        }
-
-        self
+    fn get_flume(&self) -> FlumeElem {
+        self.style.flume.clone()
     }
 }
 
-impl Events for Div {
-    fn click(&self, set_focus: &mut bool) -> bool {
-        let Some(c) = &self.on_click else { return false; };
-        c();
-
-        true
-    }
-
-    fn drag_over(&self, view: Option<View>) {}
-
-    fn key_down(&self, key: verdant::prelude::Key) {
-
-    }
+#[macro_export]
+macro_rules! div {
+    ( $($child:expr),* $(,)? ) => {
+        Div::new(vec![
+            $($child),*
+        ])
+    };
 }
