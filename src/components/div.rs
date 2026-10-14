@@ -7,7 +7,7 @@ use crate::{SenNotif, style::SenStyle, view::{Component, Stateful, View}};
 
 fn default_style() -> SenStyle {
     let stl = SenStyle::new();
-    stl.verdant().fill(Color::RED);
+    stl.verdant().fill(Color::BLACK);
 
     stl.flume.style_with(|_, fun| {
         fun.size = Size::take(10., 10.);

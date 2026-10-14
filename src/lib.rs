@@ -209,7 +209,10 @@ impl Sen {
             break;
         }
 
-        return Some(nd.target.clone());
+        return match self.layout_arena.get(&current) {
+            Some(val) => Some(val.target.clone()),
+            None => None,
+        }
     }
 }
 

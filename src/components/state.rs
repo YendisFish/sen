@@ -3,7 +3,7 @@ use std::{rc::Rc, sync::{Arc, Mutex, MutexGuard, OnceLock, mpsc::Sender,}};
 use flume::{FlumeElem, FlumeNode, PassCtx, Size, layout};
 use verdant::{types::Color, window::WindowDraw};
 
-use crate::{SenNotif, style::SenStyle, view::{Component, Stateful, View}};
+use crate::{SenNotif, components::div::Div, div, style::SenStyle, view::{Component, Stateful, View}};
 
 pub struct StateHandle<T: Send + Sync + 'static> {
     owner: usize,
@@ -33,8 +33,8 @@ pub struct State<T: Send + Sync + 'static> {
     id: Mutex<Option<usize>>,
     style: SenStyle,
     hook: Arc<Mutex<T>>,
-    children: Mutex<Vec<Component>>,
-    pub(crate) generator: OnceLock<Box<dyn Fn(&T) -> Vec<Component> + 'static>>,
+    children: Mutex<Component>,
+    pub(crate) generator: OnceLock<Box<dyn Fn(&T) -> Component + 'static>>,
     channel: OnceLock<Arc<Sender<SenNotif>>>,
 }
 
@@ -44,13 +44,13 @@ impl<T: Send + Sync + 'static> State<T> {
             id: Mutex::new(None),
             style: SenStyle::sync(),
             hook: Arc::new(Mutex::new(val)),
-            children: Mutex::new(vec![]),
+            children: Mutex::new(div![]),
             generator: OnceLock::new(),
             channel: OnceLock::new(),
         })
     }
 
-    pub fn with(self: Rc<Self>, fun: impl Fn(&T) -> Vec<Component> + 'static) -> Component {
+    pub fn with(self: Rc<Self>, fun: impl Fn(&T) -> Component + 'static) -> Component {
         _ = self.generator.set(Box::new(fun));
 
         match self.children.lock() {
@@ -138,8 +138,8 @@ impl<T: Send + Sync + 'static> View for State<T> {
 
     fn get_children(&self) -> Vec<Component> {
         match self.children.lock() {
-            Ok(v) => v.clone(),
-            Err(e) => e.into_inner().clone(),
+            Ok(v) => vec![v.clone()],
+            Err(e) => vec![e.into_inner().clone()],
         }
     }
 
@@ -186,17 +186,16 @@ impl<T: Send + Sync + 'static> View for State<T> {
 
 impl<T: Send + Sync + 'static> FlumeNode for State<T> {
     fn get_children_nodes(&self, n: usize) -> Option<Rc<dyn FlumeNode>> {
+        if n > 0 {
+            return None;
+        }
+
         let children_lock = match self.children.lock() {
             Ok(v) => v,
             Err(e) => e.into_inner(),
         };
 
-
-        if let Some(ret) = children_lock.get(n) {
-            return Some(ret.clone() as Rc<dyn FlumeNode>);
-        }
-
-        None
+        return Some(children_lock.clone());
     }
 
     fn ctx(&self, existing: Option<&PassCtx>) -> PassCtx {
@@ -209,15 +208,15 @@ impl<T: Send + Sync + 'static> FlumeNode for State<T> {
 }
 
 impl<T: Send + Sync + 'static> Stateful for State<T> {
-    fn generate_children(&self) -> Vec<Component> {
-        let Some(val) = self.hook.lock().ok() else { return vec![]; };
+    fn generate_children(&self) -> Component {
+        let Some(val) = self.hook.lock().ok() else { return div![]; };
         match self.generator.get() {
             Some(fun) => fun(&val),
-            None => vec![],
+            None => div![],
         }
     }
 
-    fn set_children(&self, chil: Vec<Component>) {
+    fn set_children(&self, chil: Component) {
         match self.children.lock() {
             Ok(mut v) => {
                 *v = chil;

@@ -6,8 +6,8 @@ use verdant::{render_surface::RenderSurface, types::Color, window::WindowDraw};
 use crate::{SenNotif, style::SenStyle};
 
 pub trait Stateful {
-    fn generate_children(&self) -> Vec<Component>;
-    fn set_children(&self, chil: Vec<Component>);
+    fn generate_children(&self) -> Component;
+    fn set_children(&self, chil: Component);
 }
 
 pub type Component = Rc<dyn View>;
